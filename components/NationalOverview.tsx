@@ -1,14 +1,14 @@
 import React from 'react';
-import { MapPin, Activity, AlertTriangle, Droplets, Building2 } from 'lucide-react';
+import { MapPin, Activity, AlertTriangle, Droplets, Building2, ChevronRight, Calendar, FileText } from 'lucide-react';
 import { AMRReport } from '../types';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 
 const MOCK_REPORTS: AMRReport[] = [
-  { id: 'R-101', location: { state: 'Gujarat', city: 'Vadodara', siteName: 'Muni. WWTP A' }, date: '2024-05-12', source: 'WWTP', dataType: 'RNA_SEQ', organism: 'P. aeruginosa', resistanceFlag: 'HIGH', summary: 'Chlorine-induced multidrug resistance', submittedBy: 'Kunal Joshi' },
-  { id: 'R-102', location: { state: 'Gujarat', city: 'Anand', siteName: 'Civil Hospital' }, date: '2024-05-10', source: 'CLINICAL', dataType: 'AST_ONLY', organism: 'K. pneumoniae', resistanceFlag: 'HIGH', summary: 'Carbapenem resistant isolate', submittedBy: 'Dr. A. Sharma' },
-  { id: 'R-103', location: { state: 'Maharashtra', city: 'Mumbai', siteName: 'Mithi River' }, date: '2024-05-08', source: 'RIVER', dataType: 'PCR', organism: 'E. coli', resistanceFlag: 'MEDIUM', summary: 'blaNDM-1 gene detected', submittedBy: 'Kunal Joshi' },
-  { id: 'R-104', location: { state: 'Karnataka', city: 'Bengaluru', siteName: 'Lake Bellandur' }, date: '2024-05-05', source: 'RIVER', dataType: 'WGS', organism: 'A. baumannii', resistanceFlag: 'HIGH', summary: 'Extensively drug resistant', submittedBy: 'Env. Lab South' },
-  { id: 'R-105', location: { state: 'Delhi', city: 'New Delhi', siteName: 'AIIMS' }, date: '2024-05-01', source: 'CLINICAL', dataType: 'AST_ONLY', organism: 'S. aureus', resistanceFlag: 'LOW', summary: 'MRSA screening positive', submittedBy: 'Central Path Lab' },
+  { id: 'R-101', location: { state: 'Gujarat', city: 'Vadodara', siteName: 'Muni. WWTP A' }, date: '2024-05-12', source: 'WWTP', dataType: 'RNA_SEQ', organism: 'P. aeruginosa', resistanceFlag: 'HIGH', summary: 'Chlorine-induced multidrug resistance' },
+  { id: 'R-102', location: { state: 'Gujarat', city: 'Anand', siteName: 'Civil Hospital' }, date: '2024-05-10', source: 'CLINICAL', dataType: 'AST_ONLY', organism: 'K. pneumoniae', resistanceFlag: 'HIGH', summary: 'Carbapenem resistant isolate' },
+  { id: 'R-103', location: { state: 'Maharashtra', city: 'Mumbai', siteName: 'Mithi River' }, date: '2024-05-08', source: 'RIVER', dataType: 'PCR', organism: 'E. coli', resistanceFlag: 'MEDIUM', summary: 'blaNDM-1 gene detected' },
+  { id: 'R-104', location: { state: 'Karnataka', city: 'Bengaluru', siteName: 'Lake Bellandur' }, date: '2024-05-05', source: 'RIVER', dataType: 'WGS', organism: 'A. baumannii', resistanceFlag: 'HIGH', summary: 'Extensively drug resistant' },
+  { id: 'R-105', location: { state: 'Delhi', city: 'New Delhi', siteName: 'AIIMS' }, date: '2024-05-01', source: 'CLINICAL', dataType: 'AST_ONLY', organism: 'S. aureus', resistanceFlag: 'LOW', summary: 'MRSA screening positive' },
 ];
 
 const SOURCE_DATA = [
@@ -17,10 +17,40 @@ const SOURCE_DATA = [
   { name: 'Environmental', value: 25 },
 ];
 
+const MAP_LOCATIONS = [
+  // West
+  { id: 1, top: '45%', left: '22%', city: 'Vadodara', state: 'Gujarat', risk: 'CRITICAL', organism: 'P. aeruginosa', color: 'bg-rose-500' },
+  { id: 5, top: '42%', left: '20%', city: 'Ahmedabad', state: 'Gujarat', risk: 'HIGH', organism: 'K. pneumoniae', color: 'bg-rose-500' },
+  { id: 16, top: '46%', left: '18%', city: 'Rajkot', state: 'Gujarat', risk: 'MEDIUM', organism: 'E. coli', color: 'bg-amber-500' },
+  
+  // North
+  { id: 2, top: '28%', left: '33%', city: 'New Delhi', state: 'Delhi', risk: 'LOW', organism: 'S. aureus', color: 'bg-green-500' },
+  { id: 15, top: '22%', left: '31%', city: 'Chandigarh', state: 'Punjab', risk: 'HIGH', organism: 'P. aeruginosa', color: 'bg-rose-500' },
+  { id: 9, top: '32%', left: '26%', city: 'Jaipur', state: 'Rajasthan', risk: 'HIGH', organism: 'MRSA', color: 'bg-rose-500' },
+  { id: 10, top: '32%', left: '42%', city: 'Lucknow', state: 'Uttar Pradesh', risk: 'HIGH', organism: 'E. coli (ESBL)', color: 'bg-rose-500' },
+
+  // Central / West Coast
+  { id: 3, top: '58%', left: '20%', city: 'Mumbai', state: 'Maharashtra', risk: 'MEDIUM', organism: 'E. coli', color: 'bg-amber-500' },
+  { id: 12, top: '61%', left: '23%', city: 'Pune', state: 'Maharashtra', risk: 'HIGH', organism: 'A. baumannii', color: 'bg-rose-500' },
+  { id: 13, top: '48%', left: '38%', city: 'Bhopal', state: 'Madhya Pradesh', risk: 'LOW', organism: 'Salmonella', color: 'bg-green-500' },
+
+  // South
+  { id: 4, top: '78%', left: '35%', city: 'Bengaluru', state: 'Karnataka', risk: 'HIGH', organism: 'A. baumannii', color: 'bg-rose-500' },
+  { id: 6, top: '78%', left: '42%', city: 'Chennai', state: 'Tamil Nadu', risk: 'CRITICAL', organism: 'C. auris', color: 'bg-rose-500' },
+  { id: 7, top: '65%', left: '38%', city: 'Hyderabad', state: 'Telangana', risk: 'HIGH', organism: 'A. baumannii', color: 'bg-rose-500' },
+  { id: 11, top: '88%', left: '32%', city: 'Kochi', state: 'Kerala', risk: 'CRITICAL', organism: 'K. pneumoniae', color: 'bg-rose-500' },
+
+  // East
+  { id: 8, top: '50%', left: '72%', city: 'Kolkata', state: 'West Bengal', risk: 'MEDIUM', organism: 'V. cholerae', color: 'bg-amber-500' },
+  { id: 14, top: '38%', left: '82%', city: 'Guwahati', state: 'Assam', risk: 'MEDIUM', organism: 'Shigella', color: 'bg-amber-500' },
+];
+
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b']; // Blue, Green, Amber
+
 const NationalOverview: React.FC<{ onSelectReport: (r: AMRReport) => void }> = ({ onSelectReport }) => {
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Stats Cards */}
+      {/* 1. TOP METRICS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
              <div className="flex items-center justify-between mb-2">
@@ -52,154 +82,174 @@ const NationalOverview: React.FC<{ onSelectReport: (r: AMRReport) => void }> = (
           </div>
       </div>
 
+      {/* 2. MAP & PIE CHART */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Map Representation */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
            <h3 className="font-bold text-slate-800 mb-4 flex items-center">
              <MapPin className="mr-2 text-blue-600" size={20}/>
              Surveillance Map: Resistance Hotspots
            </h3>
-           <div className="bg-slate-50 rounded-lg h-[600px] flex items-center justify-center relative overflow-hidden border border-slate-100 p-4">
-              {/* Using a reliable background map image instead of complex SVG path */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                 <img 
-                    src="https://upload.wikimedia.org/wikipedia/commons/b/bv/India_location_map.svg" 
-                    alt="India Map" 
-                    className="h-full w-auto object-contain grayscale" 
-                 />
-              </div>
-
-              {/* Markers positioned with percentages for responsiveness */}
-              
-              {/* Vadodara/Gujarat - Roughly West */}
-              <div className="absolute top-[48%] left-[28%] group cursor-pointer z-10" onClick={() => alert('View Gujarat Report')}>
-                 <span className="relative flex h-6 w-6">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-6 w-6 bg-rose-500 border-2 border-white shadow-md"></span>
-                 </span>
-                 <div className="absolute left-8 top-0 bg-white px-3 py-1.5 rounded-lg shadow-xl border border-slate-100 text-xs font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                    <p className="text-rose-600">Critical Hotspot</p>
-                    Vadodara, Gujarat
-                 </div>
-              </div>
-
-               {/* Delhi - North */}
-               <div className="absolute top-[28%] left-[38%] group cursor-pointer z-10">
-                 <span className="relative flex h-4 w-4">
-                    <span className="relative inline-flex rounded-full h-4 w-4 bg-orange-400 border-2 border-white shadow-md"></span>
-                 </span>
-                 <div className="absolute left-6 top-0 bg-white px-2 py-1 rounded shadow-lg text-xs font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                    New Delhi
-                 </div>
-              </div>
-
-               {/* Mumbai - West Coast */}
-               <div className="absolute top-[60%] left-[28%] group cursor-pointer z-10">
-                 <span className="relative flex h-4 w-4">
-                    <span className="relative inline-flex rounded-full h-4 w-4 bg-orange-400 border-2 border-white shadow-md"></span>
-                 </span>
-                 <div className="absolute left-6 top-0 bg-white px-2 py-1 rounded shadow-lg text-xs font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                    Mumbai
-                 </div>
-              </div>
-
-               {/* Bengaluru - South */}
-               <div className="absolute top-[75%] left-[40%] group cursor-pointer z-10">
-                 <span className="relative flex h-4 w-4">
-                    <span className="relative inline-flex rounded-full h-4 w-4 bg-yellow-400 border-2 border-white shadow-md"></span>
-                 </span>
-                 <div className="absolute left-6 top-0 bg-white px-2 py-1 rounded shadow-lg text-xs font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                    Bengaluru
-                 </div>
-              </div>
-
-               {/* Kolkata - East */}
-               <div className="absolute top-[45%] left-[65%] group cursor-pointer z-10">
-                 <span className="relative flex h-3 w-3">
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-slate-400 border-2 border-white shadow-md"></span>
-                 </span>
-                 <div className="absolute left-6 top-0 bg-white px-2 py-1 rounded shadow-lg text-xs font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                    Kolkata (Monitoring)
-                 </div>
-              </div>
-
-              <div className="absolute top-4 right-4 bg-white/95 p-4 rounded-xl text-xs text-slate-500 shadow-sm border border-slate-100 backdrop-blur-md w-48">
-                  <div className="font-bold mb-3 text-slate-800 text-sm">Live Surveillance Feed</div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse"></div> 
-                        <span className="font-medium text-slate-700">Critical (Genomic Confirmed)</span>
+           <div className="bg-slate-50 rounded-lg h-[600px] relative overflow-hidden border border-slate-100 p-4 flex items-center justify-center">
+              <div className="relative h-full w-full max-w-[500px]">
+                  {/* Map Image - Using PNG for better reliability */}
+                  <img 
+                    src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bh/India_location_map.svg/862px-India_location_map.svg.png" 
+                    alt="Map of India" 
+                    className="h-full w-full object-contain mix-blend-multiply opacity-90 z-0 relative" 
+                  />
+                  
+                  {/* DYNAMIC MARKERS */}
+                  {MAP_LOCATIONS.map((loc) => (
+                    <div 
+                        key={loc.id} 
+                        className="absolute group cursor-pointer z-10" 
+                        style={{ top: loc.top, left: loc.left }}
+                    >
+                        <div className="relative">
+                            {/* Ping animation for Critical/High */}
+                            {(loc.risk === 'CRITICAL' || loc.risk === 'HIGH') && (
+                                <div className={`absolute -inset-2 ${loc.color} rounded-full opacity-30 animate-ping`}></div>
+                            )}
+                            {/* The Dot */}
+                            <div className={`w-3 h-3 ${loc.color} border-2 border-white rounded-full shadow-lg`}></div>
+                            
+                            {/* Tooltip */}
+                            <div className="absolute left-4 bottom-4 bg-white p-3 rounded-lg shadow-xl border border-slate-100 w-48 opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none transform translate-y-2 group-hover:translate-y-0 duration-200">
+                                <p className="text-xs font-bold text-slate-800">{loc.city}, {loc.state}</p>
+                                <div className="flex justify-between items-center mt-2 border-t border-slate-50 pt-2">
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-wide">Bacteria</span>
+                                    <span className="text-[10px] font-medium text-slate-700">{loc.organism}</span>
+                                </div>
+                                <div className="flex justify-between items-center mt-1">
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-wide">Alert</span>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                        loc.risk === 'CRITICAL' || loc.risk === 'HIGH' ? 'bg-rose-100 text-rose-700' :
+                                        loc.risk === 'MEDIUM' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                                    }`}>{loc.risk}</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 bg-orange-400 rounded-full"></div> 
-                        <span>High Risk (Phenotypic)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 bg-yellow-400 rounded-full"></div> 
-                        <span>Moderate Risk</span>
-                    </div>
-                  </div>
+                  ))}
               </div>
            </div>
         </div>
 
-        {/* Source Distribution */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col h-full">
            <h3 className="font-bold text-slate-800 mb-4">Sample Sources</h3>
-           <div className="h-48">
+           <div className="h-48 shrink-0">
              <ResponsiveContainer width="100%" height="100%">
                <PieChart>
-                 <Pie data={SOURCE_DATA} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                   <Cell fill="#3b82f6" />
-                   <Cell fill="#10b981" />
-                   <Cell fill="#f59e0b" />
+                 <Pie 
+                    data={SOURCE_DATA} 
+                    innerRadius={60} 
+                    outerRadius={80} 
+                    paddingAngle={5} 
+                    dataKey="value"
+                 >
+                   {SOURCE_DATA.map((entry, index) => (
+                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                   ))}
                  </Pie>
                  <Tooltip />
                </PieChart>
              </ResponsiveContainer>
            </div>
-           <div className="space-y-3 mt-4">
+           
+           <div className="space-y-3 mt-4 mb-6">
              {SOURCE_DATA.map((entry, index) => (
-               <div key={index} className="flex justify-between items-center text-sm p-2 hover:bg-slate-50 rounded-lg transition-colors">
-                 <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${index === 0 ? 'bg-blue-500' : index === 1 ? 'bg-green-500' : 'bg-orange-500'}`}></div>
-                    <span className="text-slate-600">{entry.name}</span>
+               <div key={index} className="flex justify-between text-sm items-center p-2 rounded hover:bg-slate-50 transition-colors">
+                 <div className="flex items-center">
+                    <div 
+                        className="w-3 h-3 rounded-full mr-3 shadow-sm" 
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    ></div>
+                    <span className="text-slate-600 font-medium">{entry.name}</span>
                  </div>
                  <span className="font-bold text-slate-800">{entry.value}%</span>
                </div>
              ))}
            </div>
+
+           {/* Risk Distribution Summary */}
+           <div className="mt-auto pt-6 border-t border-slate-100">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Risk Distribution</h4>
+                <div className="space-y-2">
+                    <div className="flex justify-between items-center text-sm p-1">
+                        <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-rose-500"></div> High / Critical</span>
+                        <span className="font-bold text-slate-800">86</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm p-1">
+                        <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-500"></div> Medium</span>
+                        <span className="font-bold text-slate-800">450</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm p-1">
+                        <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-500"></div> Low / Surveillance</span>
+                        <span className="font-bold text-slate-800">712</span>
+                    </div>
+                </div>
+           </div>
         </div>
       </div>
 
-      {/* Recent Reports List */}
-       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* 3. RECENT REPORTS LIST */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="font-bold text-slate-800">Recent Surveillance Reports</h3>
-            <button className="text-xs text-blue-600 font-medium hover:underline">View All Database</button>
+             <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <FileText size={20} className="text-blue-600"/> Recently Submitted Reports
+             </h3>
+             <button className="text-sm text-blue-600 font-medium hover:underline">View All</button>
           </div>
-          <div className="divide-y divide-slate-100">
-             {MOCK_REPORTS.map((report) => (
-               <div key={report.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer group" onClick={() => onSelectReport(report)}>
-                  <div className="flex items-start space-x-4">
-                     <div className={`mt-1.5 w-2.5 h-2.5 rounded-full ${report.resistanceFlag === 'HIGH' ? 'bg-rose-500' : report.resistanceFlag === 'MEDIUM' ? 'bg-orange-500' : 'bg-yellow-500'}`}></div>
-                     <div>
-                        <h4 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
-                            {report.location.city} - {report.organism}
-                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-500 border border-slate-200">{report.dataType}</span>
-                        </h4>
-                        <p className="text-xs text-slate-500 mt-0.5">{report.location.siteName} • {report.source} • <span className="font-medium text-slate-600">By: {report.submittedBy || 'Unknown'}</span></p>
-                     </div>
-                  </div>
-                  <span className="text-blue-600 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
-                      Analyze Report <MapPin size={12} className="ml-1"/>
-                  </span>
-               </div>
-             ))}
+          <div className="overflow-x-auto">
+             <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                   <tr>
+                      <th className="p-4 pl-6">Report ID</th>
+                      <th className="p-4">Location</th>
+                      <th className="p-4">Organism</th>
+                      <th className="p-4">Data Type</th>
+                      <th className="p-4">Risk Level</th>
+                      <th className="p-4 text-left w-40">Action</th>
+                   </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                   {MOCK_REPORTS.map((report) => (
+                      <tr key={report.id} className="hover:bg-slate-50 group transition-colors">
+                         <td className="p-4 pl-6 font-mono font-medium text-slate-600">{report.id}</td>
+                         <td className="p-4">
+                            <div className="font-medium text-slate-800">{report.location.city}</div>
+                            <div className="text-xs text-slate-500">{report.location.siteName}</div>
+                         </td>
+                         <td className="p-4 font-bold text-slate-700 italic">{report.organism}</td>
+                         <td className="p-4">
+                            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-medium border border-slate-200">
+                               {report.dataType.replace('_', ' ')}
+                            </span>
+                         </td>
+                         <td className="p-4">
+                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                               report.resistanceFlag === 'HIGH' ? 'bg-rose-100 text-rose-700' : 
+                               report.resistanceFlag === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' : 
+                               'bg-green-100 text-green-700'
+                            }`}>
+                               {report.resistanceFlag}
+                            </span>
+                         </td>
+                         <td className="p-4">
+                            <button 
+                               onClick={() => onSelectReport(report)}
+                               className="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 font-medium text-xs px-4 py-2 rounded-lg transition-colors flex items-center justify-center w-full gap-2"
+                            >
+                               View Report <ChevronRight size={14}/>
+                            </button>
+                         </td>
+                      </tr>
+                   ))}
+                </tbody>
+             </table>
           </div>
-       </div>
+      </div>
     </div>
   );
 };
-
 export default NationalOverview;

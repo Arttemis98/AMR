@@ -34,6 +34,7 @@ import {
 } from 'recharts';
 import { GeneExpression, EnrichmentTerm, BlastHit } from '../types';
 import AdvancedNGSAnalytics from './AdvancedNGSAnalytics';
+import GeneMechanismTable from './GeneMechanismTable';
 
 // --- MOCK DATA ---
 
@@ -348,6 +349,9 @@ const NGSAnalysisTool: React.FC = () => {
 
        {/* Integrated Advanced Analytics (Heatmap, Pathway, SNP) */}
        <AdvancedNGSAnalytics dataType="RNA_SEQ" />
+
+       {/* Gene Mechanism Table */}
+       <GeneMechanismTable data={MOCK_GENE_DATA} />
     </div>
   );
 

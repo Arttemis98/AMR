@@ -24,7 +24,9 @@ import {
   Thermometer,
   RotateCcw,
   AlertTriangle,
-  FlaskConical
+  FlaskConical,
+  Disc,
+  GitMerge
 } from 'lucide-react';
 import {
   LineChart,
@@ -48,9 +50,11 @@ import GeneMechanismTable from './GeneMechanismTable';
 import CoOccurrenceNetwork from './CoOccurrenceNetwork';
 import PCRAnalysisSuite, { PCRProtocol, QCData } from './PCRAnalysisSuite';
 import PhylogenyAnalysis from './PhylogenyAnalysis';
+import PlasmidMapper from './PlasmidMapper';
+import MetabolicPathwayMapper from './MetabolicPathwayMapper';
 import { GeneExpression } from '../types';
 
-type ToolModule = 'HUB' | 'QC' | 'AST' | 'PHYLO' | 'PCR';
+type ToolModule = 'HUB' | 'QC' | 'AST' | 'PHYLO' | 'PCR' | 'PLASMID' | 'METABOLIC';
 type NGSType = 'NONE' | 'WGS' | 'RNA' | '16S';
 type ASTMode = 'DISK' | 'MIC';
 
@@ -406,6 +410,38 @@ const OpenToolkit: React.FC = () => {
       setMicInput({ antibiotic: '', value: '', bpS: '', bpR: '' });
   };
 
+  const loadSampleASTData = () => {
+    if (astMode === 'DISK') {
+        const sampleDiskData: ASTEntry[] = [
+            { id: 1, mechanism: 'Cell Wall Synthesis Inhibitors', classification: 'Penicillins', antibiotic: 'Penicillin G', abbr: 'P', concValue: '10', concUnit: 'units', zone: 15, result: 'R' },
+            { id: 2, mechanism: 'DNA/RNA Synthesis Inhibitors', classification: 'Fluoroquinolones', antibiotic: 'Ciprofloxacin', abbr: 'CIP', concValue: '5', concUnit: 'mcg', zone: 28, result: 'S' },
+            { id: 3, mechanism: 'Protein Synthesis Inhibitors', classification: 'Aminoglycosides', antibiotic: 'Gentamicin', abbr: 'CN', concValue: '10', concUnit: 'mcg', zone: 13, result: 'I' },
+            { id: 4, mechanism: 'Cell Wall Synthesis Inhibitors', classification: 'Carbapenems', antibiotic: 'Meropenem', abbr: 'MEM', concValue: '10', concUnit: 'mcg', zone: 25, result: 'S' },
+            { id: 5, mechanism: 'Metabolic & Membrane Agents', classification: 'Glycopeptides', antibiotic: 'Vancomycin', abbr: 'VA', concValue: '30', concUnit: 'mcg', zone: 10, result: 'R' }, // S. aureus context usually
+            { id: 6, mechanism: 'Protein Synthesis Inhibitors', classification: 'Tetracyclines', antibiotic: 'Tetracycline', abbr: 'TE', concValue: '30', concUnit: 'mcg', zone: 16, result: 'I' },
+            { id: 7, mechanism: 'Cell Wall Synthesis Inhibitors', classification: 'Cephalosporins (3rd, 4th & 5th Gen)', antibiotic: 'Ceftazidime', abbr: 'CAZ', concValue: '30', concUnit: 'mcg', zone: 14, result: 'R' },
+            { id: 8, mechanism: 'Protein Synthesis Inhibitors', classification: 'Aminoglycosides', antibiotic: 'Amikacin', abbr: 'AK', concValue: '30', concUnit: 'mcg', zone: 22, result: 'S' },
+            { id: 9, mechanism: 'Metabolic & Membrane Agents', classification: 'Urinary Tract Agents', antibiotic: 'Nitrofurantoin', abbr: 'F', concValue: '300', concUnit: 'mcg', zone: 19, result: 'S' },
+            { id: 10, mechanism: 'Metabolic & Membrane Agents', classification: 'Folate Pathway', antibiotic: 'Trimethoprim-Sulfamethoxazole', abbr: 'SXT', concValue: '1.25/23.75', concUnit: 'mcg', zone: 9, result: 'R' },
+        ];
+        setAstEntries(sampleDiskData);
+    } else {
+        const sampleMicData: MICEntry[] = [
+             { id: 101, antibiotic: 'Ciprofloxacin', micValue: 0.25, breakPointS: 1, breakPointR: 4, result: 'S' },
+             { id: 102, antibiotic: 'Gentamicin', micValue: 8, breakPointS: 4, breakPointR: 16, result: 'I' },
+             { id: 103, antibiotic: 'Meropenem', micValue: 32, breakPointS: 2, breakPointR: 8, result: 'R' },
+             { id: 104, antibiotic: 'Colistin', micValue: 0.5, breakPointS: 2, breakPointR: 4, result: 'S' },
+             { id: 105, antibiotic: 'Ceftazidime', micValue: 64, breakPointS: 8, breakPointR: 32, result: 'R' },
+             { id: 106, antibiotic: 'Tetracycline', micValue: 8, breakPointS: 4, breakPointR: 16, result: 'I' },
+             { id: 107, antibiotic: 'Amikacin', micValue: 2, breakPointS: 16, breakPointR: 64, result: 'S' },
+             { id: 108, antibiotic: 'Imipenem', micValue: 0.5, breakPointS: 2, breakPointR: 8, result: 'S' },
+             { id: 109, antibiotic: 'Piperacillin-Tazobactam', micValue: 128, breakPointS: 16, breakPointR: 128, result: 'R' },
+             { id: 110, antibiotic: 'Levofloxacin', micValue: 4, breakPointS: 2, breakPointR: 8, result: 'I' },
+        ];
+        setMicEntries(sampleMicData);
+    }
+  };
+
   const handlePcrLoadDemo = () => {
     // blaNDM-1 partial sequence and primers
     setPcrState(prev => ({
@@ -525,6 +561,20 @@ GTAGCGCAAGCCAGCACGCGCCAACCGCTAGGC`,
           <h3 className="font-bold text-slate-800 text-lg mb-2">In-Silico PCR Simulator</h3>
           <p className="text-sm text-slate-500 mb-4">Simulate PCR amplification, check primer thermodynamics, and view virtual agarose gels.</p>
           <div className="flex items-center text-purple-600 text-sm font-medium">Launch Tool <ChevronRight size={16} /></div>
+        </div>
+
+        <div onClick={() => setActiveModule('PLASMID')} className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-pink-300 transition-all cursor-pointer">
+          <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center text-pink-600 mb-4 group-hover:scale-110 transition-transform"><Disc size={24} /></div>
+          <h3 className="font-bold text-slate-800 text-lg mb-2">Plasmid Map Visualizer</h3>
+          <p className="text-sm text-slate-500 mb-4">Design circular plasmid maps, annotate resistance genes, and visualize restriction sites.</p>
+          <div className="flex items-center text-pink-600 text-sm font-medium">Launch Tool <ChevronRight size={16} /></div>
+        </div>
+
+        <div onClick={() => setActiveModule('METABOLIC')} className="group bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-orange-300 transition-all cursor-pointer">
+          <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 mb-4 group-hover:scale-110 transition-transform"><GitMerge size={24} /></div>
+          <h3 className="font-bold text-slate-800 text-lg mb-2">Metabolic Pathway Mapper</h3>
+          <p className="text-sm text-slate-500 mb-4">Link RNA-seq differential expression to metabolic flux changes (e.g. Vancomycin resistance).</p>
+          <div className="flex items-center text-orange-600 text-sm font-medium">Launch Tool <ChevronRight size={16} /></div>
         </div>
       </div>
     </div>
@@ -705,7 +755,7 @@ GTAGCGCAAGCCAGCACGCGCCAACCGCTAGGC`,
 
   const renderAST = () => (
      <div className="animate-fade-in space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-col md:flex-row items-center justify-between mb-2 gap-4">
           <div className="flex items-center space-x-4">
             <button onClick={() => setActiveModule('HUB')} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600">
                 <ArrowLeft size={20} />
@@ -715,19 +765,27 @@ GTAGCGCAAGCCAGCACGCGCCAACCGCTAGGC`,
                 <p className="text-slate-500">Phenotypic susceptibility analysis & interpretation</p>
             </div>
           </div>
-          <div className="flex bg-slate-100 rounded-lg p-1">
-              <button 
-                onClick={() => setAstMode('DISK')} 
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${astMode === 'DISK' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                Disk Diffusion (Zone)
-              </button>
-              <button 
-                onClick={() => setAstMode('MIC')} 
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${astMode === 'MIC' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                MIC (Dilution)
-              </button>
+          <div className="flex items-center gap-3">
+             <button 
+                onClick={loadSampleASTData}
+                className="text-xs flex items-center text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-2 rounded-lg transition-colors font-bold border border-indigo-100"
+             >
+                <Play size={14} className="mr-1"/> Load Demo Data
+            </button>
+            <div className="flex bg-slate-100 rounded-lg p-1">
+                <button 
+                    onClick={() => setAstMode('DISK')} 
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${astMode === 'DISK' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    Disk Diffusion (Zone)
+                </button>
+                <button 
+                    onClick={() => setAstMode('MIC')} 
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${astMode === 'MIC' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    MIC (Dilution)
+                </button>
+            </div>
           </div>
         </div>
 
@@ -1040,7 +1098,7 @@ GTAGCGCAAGCCAGCACGCGCCAACCGCTAGGC`,
                        <thead><tr className="border-b"><th className="p-2">Seq</th><th className="p-2">Sample_01</th><th className="p-2">PAO1</th><th className="p-2">Putida</th></tr></thead>
                        <tbody>
                           <tr><td className="p-2 font-bold">Sample_01</td><td className="p-2 bg-slate-100">0.00</td><td className="p-2">0.02</td><td className="p-2">0.15</td></tr>
-                          <tr><td className="p-2 font-bold">PAO1</td><td className="p-2">0.02</td><td className="p-2 bg-slate-100">0.00</td><td className="p-2">0.14</td></tr>
+                          <tr><td className="p-2 font-bold">PAO1</td><td className="p-2">0.001</td><td className="bg-slate-100 p-2">-</td><td className="p-2">0.014</td></tr>
                           <tr><td className="p-2 font-bold">Putida</td><td className="p-2">0.15</td><td className="p-2">0.14</td><td className="p-2 bg-slate-100">0.00</td></tr>
                        </tbody>
                     </table>
@@ -1206,6 +1264,36 @@ GTAGCGCAAGCCAGCACGCGCCAACCGCTAGGC`,
     </div>
   );
 
+  const renderPlasmid = () => (
+    <div className="animate-fade-in space-y-6">
+      <div className="flex items-center space-x-4 mb-2">
+        <button onClick={() => setActiveModule('HUB')} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600">
+           <ArrowLeft size={20} />
+        </button>
+        <div>
+           <h2 className="text-2xl font-bold text-slate-800">Plasmid Map Visualizer</h2>
+           <p className="text-slate-500">Design circular plasmid maps, annotate resistance genes, and visualize restriction sites.</p>
+        </div>
+      </div>
+      <PlasmidMapper />
+    </div>
+  );
+
+  const renderMetabolic = () => (
+    <div className="animate-fade-in space-y-6">
+      <div className="flex items-center space-x-4 mb-2">
+        <button onClick={() => setActiveModule('HUB')} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600">
+           <ArrowLeft size={20} />
+        </button>
+        <div>
+           <h2 className="text-2xl font-bold text-slate-800">Metabolic Pathway Mapper</h2>
+           <p className="text-slate-500">Integrate Transcriptomics with Metabolomics (KEGG)</p>
+        </div>
+      </div>
+      <MetabolicPathwayMapper />
+    </div>
+  );
+
   return (
     <div className="min-h-[600px]">
       {activeModule === 'HUB' && renderHub()}
@@ -1213,6 +1301,8 @@ GTAGCGCAAGCCAGCACGCGCCAACCGCTAGGC`,
       {activeModule === 'AST' && renderAST()}
       {activeModule === 'PHYLO' && <PhylogenyAnalysis onBack={() => setActiveModule('HUB')} />}
       {activeModule === 'PCR' && renderPCR()}
+      {activeModule === 'PLASMID' && renderPlasmid()}
+      {activeModule === 'METABOLIC' && renderMetabolic()}
     </div>
   );
 };
