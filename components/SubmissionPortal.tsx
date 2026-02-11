@@ -1,5 +1,24 @@
 import React, { useState } from 'react';
-import { UploadCloud, FileText, CheckCircle, ChevronRight, MapPin, FlaskConical, Dna, PlayCircle, Eye, X, FileSpreadsheet } from 'lucide-react';
+import { 
+  UploadCloud, 
+  FileText, 
+  CheckCircle, 
+  ChevronRight, 
+  MapPin, 
+  FlaskConical, 
+  Dna, 
+  PlayCircle, 
+  Eye, 
+  X, 
+  FileSpreadsheet, 
+  Calendar, 
+  Thermometer, 
+  Droplets, 
+  Activity, 
+  Ruler, 
+  Microscope,
+  Globe
+} from 'lucide-react';
 import { DataType, SampleSource } from '../types';
 
 const INDIAN_STATES = [
@@ -25,15 +44,36 @@ const CITIES: Record<string, string[]> = {
   "Other": ["Capital City", "District Headquarters", "Rural District"]
 };
 
+const CLINICAL_SAMPLES = ["Blood Culture", "Urine", "Sputum / Respiratory", "Wound Swab", "Stool", "CSF", "Tissue Biopsy"];
+const STANDARDS = ["CLSI M100 (2024)", "CLSI M100 (2023)", "EUCAST v14.0", "WHO-NET Standard", "Internal Protocol"];
+
 const SubmissionPortal: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const [step, setStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  
   const [formData, setFormData] = useState({
+     // Location
      state: '',
      city: '',
+     latitude: '',
+     longitude: '',
+     
+     // Sample Details
+     collectionDate: '',
      sourceType: '' as SampleSource | '',
+     
+     // Environmental Specific
+     ph: '',
+     temperature: '',
+     cod: '', // Chemical Oxygen Demand
+     
+     // Clinical Specific
+     clinicalSampleType: '',
+     
+     // Analysis
      dataType: '' as DataType | '',
+     standard: 'CLSI M100 (2024)',
      file: null as File | null
   });
 
@@ -45,11 +85,18 @@ const SubmissionPortal: React.FC<{ onComplete: () => void }> = ({ onComplete }) 
     setFormData({
       state: 'Gujarat',
       city: 'Vadodara',
+      latitude: '22.3072',
+      longitude: '73.1812',
+      collectionDate: '2024-05-12',
       sourceType: 'WWTP',
+      ph: '7.4',
+      temperature: '28.5',
+      cod: '450',
+      clinicalSampleType: '',
       dataType: 'AST_ONLY',
+      standard: 'CLSI M100 (2024)',
       file: new File(["Antibiotic,Zone,Conc\nCip,12,5mcg"], "ast_vadodara_wwtp_2024.csv", { type: "text/csv" })
     });
-    // Do not auto-advance, let user see the filled data, but maybe scroll or highlight "Next"
   };
 
   const handleSubmit = () => {
@@ -63,6 +110,9 @@ const SubmissionPortal: React.FC<{ onComplete: () => void }> = ({ onComplete }) 
     }
   };
 
+  const isEnvironmental = ['WWTP', 'RIVER', 'SOIL'].includes(formData.sourceType);
+  const isClinical = formData.sourceType === 'CLINICAL' || formData.sourceType === 'LIVESTOCK';
+
   const renderStep1 = () => (
      <div className="space-y-6 animate-fade-in">
         <div className="flex justify-between items-center">
@@ -75,9 +125,10 @@ const SubmissionPortal: React.FC<{ onComplete: () => void }> = ({ onComplete }) 
             </button>
         </div>
         
+        {/* ROW 1: Geography */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">State / Union Territory</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">State / Union Territory <span className="text-red-500">*</span></label>
               <select 
                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                  value={formData.state}
@@ -90,7 +141,7 @@ const SubmissionPortal: React.FC<{ onComplete: () => void }> = ({ onComplete }) 
               </select>
            </div>
            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">City / District</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">City / District <span className="text-red-500">*</span></label>
               <select 
                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                  value={formData.city}
@@ -105,8 +156,54 @@ const SubmissionPortal: React.FC<{ onComplete: () => void }> = ({ onComplete }) 
               </select>
            </div>
         </div>
+
+        {/* ROW 2: Date & GPS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+               <label className="block text-sm font-medium text-slate-700 mb-1">Collection Date <span className="text-red-500">*</span></label>
+               <div className="relative">
+                  <Calendar className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input 
+                    type="date" 
+                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+                    value={formData.collectionDate}
+                    onChange={(e) => setFormData({...formData, collectionDate: e.target.value})}
+                  />
+               </div>
+            </div>
+            <div>
+               <label className="block text-sm font-medium text-slate-700 mb-1">Latitude (Optional)</label>
+               <div className="relative">
+                  <MapPin className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 22.3072"
+                    step="0.0001"
+                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+                    value={formData.latitude}
+                    onChange={(e) => setFormData({...formData, latitude: e.target.value})}
+                  />
+               </div>
+            </div>
+            <div>
+               <label className="block text-sm font-medium text-slate-700 mb-1">Longitude (Optional)</label>
+               <div className="relative">
+                  <Globe className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 73.1812"
+                    step="0.0001"
+                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+                    value={formData.longitude}
+                    onChange={(e) => setFormData({...formData, longitude: e.target.value})}
+                  />
+               </div>
+            </div>
+        </div>
+
+        {/* ROW 3: Sample Source */}
         <div>
-           <label className="block text-sm font-medium text-slate-700 mb-2">Sample Source</label>
+           <label className="block text-sm font-medium text-slate-700 mb-2">Sample Source <span className="text-red-500">*</span></label>
            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {(['CLINICAL', 'WWTP', 'RIVER', 'SOIL', 'LIVESTOCK'] as SampleSource[]).map((src) => (
                  <button
@@ -123,10 +220,78 @@ const SubmissionPortal: React.FC<{ onComplete: () => void }> = ({ onComplete }) 
               ))}
            </div>
         </div>
+
+        {/* DYNAMIC METADATA FIELDS */}
+        {formData.sourceType && (
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 animate-fade-in">
+               <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                   {isEnvironmental ? <Droplets size={14} /> : <Activity size={14} />}
+                   {isEnvironmental ? 'Environmental Parameters' : 'Clinical Specifics'}
+               </h4>
+               
+               {isEnvironmental && (
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                       <div>
+                           <label className="block text-xs font-medium text-slate-600 mb-1">pH Level</label>
+                           <div className="relative">
+                               <FlaskConical className="absolute left-3 top-2 text-slate-400" size={14} />
+                               <input 
+                                  type="number" 
+                                  step="0.1" 
+                                  placeholder="7.0" 
+                                  className="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded text-sm bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 shadow-sm"
+                                  value={formData.ph}
+                                  onChange={(e) => setFormData({...formData, ph: e.target.value})}
+                               />
+                           </div>
+                       </div>
+                       <div>
+                           <label className="block text-xs font-medium text-slate-600 mb-1">Temperature (°C)</label>
+                           <div className="relative">
+                               <Thermometer className="absolute left-3 top-2 text-slate-400" size={14} />
+                               <input 
+                                  type="number" 
+                                  step="0.1" 
+                                  placeholder="25.0" 
+                                  className="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded text-sm bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 shadow-sm"
+                                  value={formData.temperature}
+                                  onChange={(e) => setFormData({...formData, temperature: e.target.value})}
+                               />
+                           </div>
+                       </div>
+                       <div>
+                           <label className="block text-xs font-medium text-slate-600 mb-1">COD (mg/L)</label>
+                           <input 
+                              type="number" 
+                              placeholder="Chemical Oxygen Demand" 
+                              className="w-full px-3 py-1.5 border border-slate-300 rounded text-sm bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 shadow-sm"
+                              value={formData.cod}
+                              onChange={(e) => setFormData({...formData, cod: e.target.value})}
+                           />
+                       </div>
+                   </div>
+               )}
+
+               {isClinical && (
+                   <div>
+                       <label className="block text-xs font-medium text-slate-600 mb-1">Specimen Type</label>
+                       <select 
+                          className="w-full px-3 py-1.5 border border-slate-300 rounded text-sm bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 shadow-sm"
+                          value={formData.clinicalSampleType}
+                          onChange={(e) => setFormData({...formData, clinicalSampleType: e.target.value})}
+                       >
+                           <option value="">Select Specimen...</option>
+                           {CLINICAL_SAMPLES.map(s => <option key={s} value={s}>{s}</option>)}
+                       </select>
+                   </div>
+               )}
+            </div>
+        )}
+
         <div className="flex justify-end pt-4">
            <button 
              onClick={() => setStep(2)}
-             disabled={!formData.state || !formData.city || !formData.sourceType}
+             disabled={!formData.state || !formData.city || !formData.sourceType || !formData.collectionDate}
              className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-colors"
            >
               Next Step <ChevronRight size={16} className="ml-2"/>
@@ -148,6 +313,18 @@ const SubmissionPortal: React.FC<{ onComplete: () => void }> = ({ onComplete }) 
        </div>
 
        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-sm font-medium text-slate-700">Methodology / Standard</label>
+            <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Compliance</span>
+          </div>
+          <select 
+             className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 mb-4 shadow-sm"
+             value={formData.standard}
+             onChange={(e) => setFormData({...formData, standard: e.target.value})}
+          >
+             {STANDARDS.map(std => <option key={std} value={std}>{std}</option>)}
+          </select>
+
           <label className="block text-sm font-medium text-slate-700 mb-2">Data Category</label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <div 
@@ -278,6 +455,24 @@ const SubmissionPortal: React.FC<{ onComplete: () => void }> = ({ onComplete }) 
               <p className="text-slate-500 mb-6">
                  Thank you for contributing to IRIS. Your data from <strong>{formData.city}, {formData.state}</strong> has been securely uploaded.
               </p>
+              
+              <div className="grid grid-cols-2 gap-2 text-xs text-left bg-slate-50 p-3 rounded-lg mb-4">
+                  <div>
+                      <span className="text-slate-400 block">Date</span>
+                      <span className="font-semibold">{formData.collectionDate}</span>
+                  </div>
+                  <div>
+                      <span className="text-slate-400 block">Standard</span>
+                      <span className="font-semibold">{formData.standard.split(' ')[0]}</span>
+                  </div>
+                  {formData.ph && (
+                    <div>
+                      <span className="text-slate-400 block">pH / Temp</span>
+                      <span className="font-semibold">{formData.ph} / {formData.temperature}°C</span>
+                    </div>
+                  )}
+              </div>
+
               <div className="bg-blue-50 p-4 rounded-lg mb-6 text-left">
                  <p className="text-sm text-blue-800 font-medium mb-1">Status:</p>
                  <p className="text-xs text-blue-600">

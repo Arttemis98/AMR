@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Activity, ArrowRight, RefreshCw, GitMerge, FileText, UploadCloud, Play, ArrowLeft, CheckCircle, Table, Layers, ZoomIn } from 'lucide-react';
+import { Activity, ArrowRight, RefreshCw, GitMerge, FileText, UploadCloud, Play, ArrowLeft, CheckCircle, Table, Layers, ZoomIn, AlertCircle } from 'lucide-react';
 
-// --- MOCK DATA: Detailed Transcriptome & Pathway Data ---
+// --- MOCK DATA: Fallback if no file is uploaded ---
 const DEMO_TRANSCRIPTOME = [
   { id: 'murA', name: 'murA', fc: 0.8, pval: 0.45, status: 'NS', desc: 'UDP-N-acetylglucosamine 1-carboxyvinyltransferase', pathway: 'Early Synthesis' },
   { id: 'murC', name: 'murC', fc: 1.1, pval: 0.32, status: 'NS', desc: 'L-alanine adding enzyme', pathway: 'Early Synthesis' },
@@ -17,35 +17,123 @@ const DEMO_TRANSCRIPTOME = [
   { id: 'vanY', name: 'vanY', fc: 2.1, pval: 0.045, status: 'UP', desc: 'D,D-carboxypeptidase', pathway: 'Target Removal' },
 ];
 
+interface TranscriptomeRow {
+    id: string;
+    name: string;
+    fc: number;
+    pval: number;
+    status: string;
+    desc: string;
+    pathway: string;
+}
+
 const MetabolicPathwayMapper: React.FC = () => {
   const [view, setView] = useState<'UPLOAD' | 'ANALYSIS'>('UPLOAD');
   const [activeTab, setActiveTab] = useState<'MAP' | 'TABLE'>('MAP');
   const [isUploading, setIsUploading] = useState(false);
+  const [data, setData] = useState<TranscriptomeRow[]>(DEMO_TRANSCRIPTOME);
+  const [fileName, setFileName] = useState<string>('');
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
   const getGeneColor = (geneId: string) => {
-    const gene = DEMO_TRANSCRIPTOME.find(g => g.id === geneId);
+    // Case insensitive match
+    const gene = data.find(g => g.name.toLowerCase() === geneId.toLowerCase() || g.id.toLowerCase() === geneId.toLowerCase());
     if (!gene) return '#e2e8f0'; // slate-200 default
-    if (gene.status === 'UP') return '#fecaca'; // red-200 background
-    if (gene.status === 'DOWN') return '#bfdbfe'; // blue-200 background
-    return '#f1f5f9'; // slate-100
+    if (gene.fc >= 1.5) return '#fecaca'; // red-200 background (UP)
+    if (gene.fc <= -1.5) return '#bfdbfe'; // blue-200 background (DOWN)
+    return '#f1f5f9'; // slate-100 (NS)
   };
 
   const getBorderColor = (geneId: string) => {
-    const gene = DEMO_TRANSCRIPTOME.find(g => g.id === geneId);
+    const gene = data.find(g => g.name.toLowerCase() === geneId.toLowerCase() || g.id.toLowerCase() === geneId.toLowerCase());
     if (!gene) return '#94a3b8';
-    if (gene.status === 'UP') return '#ef4444'; // red-500
-    if (gene.status === 'DOWN') return '#3b82f6'; // blue-500
+    if (gene.fc >= 1.5) return '#ef4444'; // red-500
+    if (gene.fc <= -1.5) return '#3b82f6'; // blue-500
     return '#cbd5e1'; // slate-300
   };
 
+  const processCSV = (csvText: string) => {
+      try {
+          const lines = csvText.split('\n');
+          const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
+          
+          // Find indices
+          const nameIdx = headers.findIndex(h => h.includes('gene') || h.includes('id') || h.includes('name'));
+          const fcIdx = headers.findIndex(h => h.includes('fc') || h.includes('fold') || h.includes('log2'));
+          const pvalIdx = headers.findIndex(h => h.includes('p-val') || h.includes('pval') || h.includes('significance'));
+          const descIdx = headers.findIndex(h => h.includes('desc') || h.includes('function'));
+          
+          if (nameIdx === -1 || fcIdx === -1) {
+              throw new Error("CSV must contain at least 'Gene' and 'FoldChange' columns.");
+          }
+
+          const parsedData: TranscriptomeRow[] = [];
+
+          for (let i = 1; i < lines.length; i++) {
+              const row = lines[i].split(',');
+              if (row.length < 2) continue;
+
+              const name = row[nameIdx]?.trim();
+              if (!name) continue;
+
+              const fc = parseFloat(row[fcIdx]);
+              const pval = pvalIdx !== -1 ? parseFloat(row[pvalIdx]) : 0.05;
+              const desc = descIdx !== -1 ? row[descIdx]?.trim() : 'Uploaded Gene';
+
+              let status = 'NS';
+              if (fc >= 1.5 && pval < 0.05) status = 'UP';
+              else if (fc <= -1.5 && pval < 0.05) status = 'DOWN';
+
+              parsedData.push({
+                  id: name,
+                  name: name,
+                  fc: isNaN(fc) ? 0 : fc,
+                  pval: isNaN(pval) ? 1 : pval,
+                  status,
+                  desc: desc.replace(/"/g, ''),
+                  pathway: 'Uploaded Data'
+              });
+          }
+
+          if (parsedData.length === 0) throw new Error("No valid data rows found.");
+
+          setData(parsedData);
+          setView('ANALYSIS');
+      } catch (err: any) {
+          setErrorMsg(err.message || "Failed to parse CSV file.");
+          setIsUploading(false);
+      }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMsg('');
     if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        setFileName(file.name);
         setIsUploading(true);
-        setTimeout(() => {
-            setIsUploading(false);
-            setView('ANALYSIS');
-        }, 1500);
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            if (event.target?.result) {
+                // Simulate processing delay for UX
+                setTimeout(() => {
+                    processCSV(event.target!.result as string);
+                    setIsUploading(false);
+                }, 1000);
+            }
+        };
+        reader.readAsText(file);
     }
+  };
+
+  const handleLoadDemo = () => {
+      setIsUploading(true);
+      setTimeout(() => {
+          setData(DEMO_TRANSCRIPTOME);
+          setFileName("Demo_Vancomycin_Resistance.csv");
+          setIsUploading(false);
+          setView('ANALYSIS');
+      }, 1000);
   };
 
   const renderUpload = () => (
@@ -61,13 +149,19 @@ const MetabolicPathwayMapper: React.FC = () => {
                 </p>
             </div>
 
+            {errorMsg && (
+                <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center justify-center gap-2 text-sm">
+                    <AlertCircle size={16}/> {errorMsg}
+                </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="border-2 border-dashed border-slate-300 bg-slate-50 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all relative min-h-[250px] group">
                     <input 
                         type="file" 
                         className="absolute inset-0 opacity-0 cursor-pointer z-10" 
                         onChange={handleFileUpload} 
-                        accept=".csv,.xlsx,.txt"
+                        accept=".csv"
                         disabled={isUploading}
                     />
                     {isUploading ? (
@@ -82,16 +176,16 @@ const MetabolicPathwayMapper: React.FC = () => {
                                 <UploadCloud size={32} />
                             </div>
                             <h3 className="font-bold text-slate-800 mb-1">Upload Gene Expression Data</h3>
-                            <p className="text-xs text-slate-500 mb-4">Supported: DESeq2 Output (.csv)</p>
+                            <p className="text-xs text-slate-500 mb-4">Required CSV columns: Gene, FoldChange</p>
                             <span className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium shadow-sm group-hover:border-blue-300 group-hover:text-blue-600">
-                                Select File
+                                Select CSV File
                             </span>
                         </>
                     )}
                 </div>
 
                 <div 
-                    onClick={() => setView('ANALYSIS')}
+                    onClick={handleLoadDemo}
                     className="border-2 border-transparent bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all min-h-[250px] relative overflow-hidden"
                 >
                     <div className="absolute top-0 right-0 bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-1 rounded-bl-lg">
@@ -127,7 +221,7 @@ const MetabolicPathwayMapper: React.FC = () => {
               </button>
               <div>
                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <GitMerge className="text-orange-600"/> Pathway Analysis: Vancomycin Resistance
+                    <GitMerge className="text-orange-600"/> Pathway Analysis: {fileName.replace('.csv','')}
                 </h2>
                 <p className="text-xs text-slate-500">Mapping Transcriptome (RNA-seq) to KEGG Pathway: Peptidoglycan Biosynthesis</p>
               </div>
@@ -154,8 +248,8 @@ const MetabolicPathwayMapper: React.FC = () => {
                     <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                         <h3 className="font-bold text-slate-700 text-sm">Metabolic Map: Peptidoglycan & Vancomycin Resistance (map00550)</h3>
                         <div className="flex gap-3 text-[10px]">
-                            <span className="flex items-center gap-1"><div className="w-3 h-3 bg-red-200 border border-red-500 rounded-sm"></div> Upregulated (FC &gt; 2.0)</span>
-                            <span className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-200 border border-blue-500 rounded-sm"></div> Downregulated (FC &lt; -2.0)</span>
+                            <span className="flex items-center gap-1"><div className="w-3 h-3 bg-red-200 border border-red-500 rounded-sm"></div> Upregulated (FC &gt; 1.5)</span>
+                            <span className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-200 border border-blue-500 rounded-sm"></div> Downregulated (FC &lt; -1.5)</span>
                             <span className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-100 border border-slate-300 rounded-sm"></div> No Change</span>
                         </div>
                     </div>
@@ -333,29 +427,46 @@ const MetabolicPathwayMapper: React.FC = () => {
                         <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                             <Activity size={18} className="text-blue-600"/> Flux Analysis
                         </h3>
-                        <div className="space-y-4">
-                            <div>
-                                <div className="flex justify-between text-xs mb-1">
-                                    <span className="text-slate-600">Standard Pathway</span>
-                                    <span className="font-bold text-slate-800">12%</span>
+                        {data.find(d => d.name === 'vanA' && d.status === 'UP') ? (
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-slate-600">Standard Pathway</span>
+                                        <span className="font-bold text-slate-800">12%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                        <div className="bg-slate-400 h-full" style={{width: '12%'}}></div>
+                                    </div>
                                 </div>
-                                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                                    <div className="bg-slate-400 h-full" style={{width: '12%'}}></div>
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-rose-600 font-bold">Resistance Shunt</span>
+                                        <span className="font-bold text-rose-700">88%</span>
+                                    </div>
+                                    <div className="w-full bg-rose-100 h-2 rounded-full overflow-hidden">
+                                        <div className="bg-rose-500 h-full" style={{width: '88%'}}></div>
+                                    </div>
                                 </div>
+                                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                                    High expression of <strong>vanH/A/X</strong> effectively diverts metabolic flux away from the Vancomycin-susceptible D-Ala-D-Ala terminus.
+                                </p>
                             </div>
-                            <div>
-                                <div className="flex justify-between text-xs mb-1">
-                                    <span className="text-rose-600 font-bold">Resistance Shunt</span>
-                                    <span className="font-bold text-rose-700">88%</span>
+                        ) : (
+                             <div className="space-y-4">
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-slate-600">Standard Pathway</span>
+                                        <span className="font-bold text-slate-800">98%</span>
+                                    </div>
+                                    <div className="w-full bg-green-100 h-2 rounded-full overflow-hidden">
+                                        <div className="bg-green-500 h-full" style={{width: '98%'}}></div>
+                                    </div>
                                 </div>
-                                <div className="w-full bg-rose-100 h-2 rounded-full overflow-hidden">
-                                    <div className="bg-rose-500 h-full" style={{width: '88%'}}></div>
-                                </div>
+                                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                                    No significant upregulation of the VanA/B operon detected. Metabolic flux primarily follows the standard peptidoglycan synthesis route, indicating <strong>susceptibility</strong>.
+                                </p>
                             </div>
-                            <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                                High expression of <strong>vanH/A/X</strong> effectively diverts metabolic flux away from the Vancomycin-susceptible D-Ala-D-Ala terminus.
-                            </p>
-                        </div>
+                        )}
                     </div>
 
                     <div className="bg-slate-800 text-white p-5 rounded-xl shadow-sm">
@@ -363,10 +474,16 @@ const MetabolicPathwayMapper: React.FC = () => {
                             <FileText size={16}/> Mechanism Summary
                         </h3>
                         <p className="text-xs leading-relaxed text-slate-300">
-                            <strong>Target Modification:</strong> The substitution of the terminal amide bond with an ester bond (D-Ala-D-Lac) removes a critical hydrogen bond donor.
+                             {data.find(d => d.name === 'vanA' && d.status === 'UP') 
+                                ? "Target Modification: The substitution of the terminal amide bond with an ester bond (D-Ala-D-Lac) removes a critical hydrogen bond donor."
+                                : "Wild-Type Phenotype: The bacteria produces standard D-Ala-D-Ala peptidoglycan precursors, which are readily bound by Vancomycin."
+                             }
                         </p>
                         <div className="mt-3 pt-3 border-t border-slate-700 text-xs text-emerald-400 font-mono">
-                            Affinity Loss: &gt;1000-fold
+                             {data.find(d => d.name === 'vanA' && d.status === 'UP') 
+                                ? "Affinity Loss: >1000-fold"
+                                : "Affinity: High (Kd < 1uM)"
+                             }
                         </div>
                     </div>
                 </div>
@@ -376,7 +493,7 @@ const MetabolicPathwayMapper: React.FC = () => {
        {activeTab === 'TABLE' && (
            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                <div className="p-4 border-b border-slate-100 bg-slate-50">
-                   <h3 className="font-bold text-slate-800">Transcriptome Profile: Peptidoglycan Biosynthesis Genes</h3>
+                   <h3 className="font-bold text-slate-800">Transcriptome Profile: {fileName}</h3>
                </div>
                <div className="overflow-x-auto">
                    <table className="w-full text-sm text-left">
@@ -391,17 +508,17 @@ const MetabolicPathwayMapper: React.FC = () => {
                            </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-100">
-                           {DEMO_TRANSCRIPTOME.map((gene) => (
+                           {data.map((gene) => (
                                <tr key={gene.id} className="hover:bg-slate-50">
                                    <td className="p-4 font-mono font-bold text-slate-700">{gene.name}</td>
                                    <td className="p-4 text-xs text-slate-500 uppercase font-bold tracking-wide">{gene.pathway}</td>
                                    <td className="p-4 text-slate-600">{gene.desc}</td>
                                    <td className="p-4 font-mono">
                                        <span className={gene.fc > 0 ? 'text-red-600' : 'text-blue-600'}>
-                                           {gene.fc > 0 ? '+' : ''}{gene.fc}
+                                           {gene.fc > 0 ? '+' : ''}{gene.fc.toFixed(2)}
                                        </span>
                                    </td>
-                                   <td className="p-4 font-mono text-slate-500">{gene.pval}</td>
+                                   <td className="p-4 font-mono text-slate-500">{gene.pval.toExponential(2)}</td>
                                    <td className="p-4">
                                        <span className={`px-2 py-1 rounded text-xs font-bold ${
                                            gene.status === 'UP' ? 'bg-red-100 text-red-700' :

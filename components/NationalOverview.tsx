@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Activity, AlertTriangle, Droplets, Building2, ChevronRight, Calendar, FileText } from 'lucide-react';
+import { MapPin, Activity, AlertTriangle, Droplets, Building2, ChevronRight, FileText } from 'lucide-react';
 import { AMRReport } from '../types';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 
@@ -17,32 +17,34 @@ const SOURCE_DATA = [
   { name: 'Environmental', value: 25 },
 ];
 
+// Calculated approximate percentages for India Map Projection (Top/Left)
+// Based on Bounding Box: N37-N6, E67-E98
 const MAP_LOCATIONS = [
-  // West
-  { id: 1, top: '45%', left: '22%', city: 'Vadodara', state: 'Gujarat', risk: 'CRITICAL', organism: 'P. aeruginosa', color: 'bg-rose-500' },
-  { id: 5, top: '42%', left: '20%', city: 'Ahmedabad', state: 'Gujarat', risk: 'HIGH', organism: 'K. pneumoniae', color: 'bg-rose-500' },
-  { id: 16, top: '46%', left: '18%', city: 'Rajkot', state: 'Gujarat', risk: 'MEDIUM', organism: 'E. coli', color: 'bg-amber-500' },
+  // GUJARAT CLUSTER
+  { id: 1, top: '47%', left: '20%', city: 'Vadodara', state: 'Gujarat', risk: 'CRITICAL', organism: 'P. aeruginosa', color: 'bg-rose-500' },
+  { id: 5, top: '45%', left: '18%', city: 'Ahmedabad', state: 'Gujarat', risk: 'HIGH', organism: 'K. pneumoniae', color: 'bg-rose-500' },
+  { id: 16, top: '47%', left: '12%', city: 'Rajkot', state: 'Gujarat', risk: 'MEDIUM', organism: 'E. coli', color: 'bg-amber-500' },
   
-  // North
-  { id: 2, top: '28%', left: '33%', city: 'New Delhi', state: 'Delhi', risk: 'LOW', organism: 'S. aureus', color: 'bg-green-500' },
-  { id: 15, top: '22%', left: '31%', city: 'Chandigarh', state: 'Punjab', risk: 'HIGH', organism: 'P. aeruginosa', color: 'bg-rose-500' },
-  { id: 9, top: '32%', left: '26%', city: 'Jaipur', state: 'Rajasthan', risk: 'HIGH', organism: 'MRSA', color: 'bg-rose-500' },
-  { id: 10, top: '32%', left: '42%', city: 'Lucknow', state: 'Uttar Pradesh', risk: 'HIGH', organism: 'E. coli (ESBL)', color: 'bg-rose-500' },
+  // NORTH
+  { id: 2, top: '27%', left: '33%', city: 'New Delhi', state: 'Delhi', risk: 'LOW', organism: 'S. aureus', color: 'bg-green-500' },
+  { id: 15, top: '20%', left: '31%', city: 'Chandigarh', state: 'Punjab', risk: 'HIGH', organism: 'P. aeruginosa', color: 'bg-rose-500' },
+  { id: 9, top: '32%', left: '28%', city: 'Jaipur', state: 'Rajasthan', risk: 'HIGH', organism: 'MRSA', color: 'bg-rose-500' },
+  { id: 10, top: '33%', left: '45%', city: 'Lucknow', state: 'Uttar Pradesh', risk: 'HIGH', organism: 'E. coli (ESBL)', color: 'bg-rose-500' },
 
-  // Central / West Coast
-  { id: 3, top: '58%', left: '20%', city: 'Mumbai', state: 'Maharashtra', risk: 'MEDIUM', organism: 'E. coli', color: 'bg-amber-500' },
-  { id: 12, top: '61%', left: '23%', city: 'Pune', state: 'Maharashtra', risk: 'HIGH', organism: 'A. baumannii', color: 'bg-rose-500' },
-  { id: 13, top: '48%', left: '38%', city: 'Bhopal', state: 'Madhya Pradesh', risk: 'LOW', organism: 'Salmonella', color: 'bg-green-500' },
+  // WEST / CENTRAL
+  { id: 3, top: '58%', left: '19%', city: 'Mumbai', state: 'Maharashtra', risk: 'MEDIUM', organism: 'E. coli', color: 'bg-amber-500' },
+  { id: 12, top: '60%', left: '22%', city: 'Pune', state: 'Maharashtra', risk: 'HIGH', organism: 'A. baumannii', color: 'bg-rose-500' },
+  { id: 13, top: '45%', left: '34%', city: 'Bhopal', state: 'Madhya Pradesh', risk: 'LOW', organism: 'Salmonella', color: 'bg-green-500' },
 
-  // South
-  { id: 4, top: '78%', left: '35%', city: 'Bengaluru', state: 'Karnataka', risk: 'HIGH', organism: 'A. baumannii', color: 'bg-rose-500' },
-  { id: 6, top: '78%', left: '42%', city: 'Chennai', state: 'Tamil Nadu', risk: 'CRITICAL', organism: 'C. auris', color: 'bg-rose-500' },
-  { id: 7, top: '65%', left: '38%', city: 'Hyderabad', state: 'Telangana', risk: 'HIGH', organism: 'A. baumannii', color: 'bg-rose-500' },
-  { id: 11, top: '88%', left: '32%', city: 'Kochi', state: 'Kerala', risk: 'CRITICAL', organism: 'K. pneumoniae', color: 'bg-rose-500' },
+  // SOUTH
+  { id: 4, top: '78%', left: '34%', city: 'Bengaluru', state: 'Karnataka', risk: 'HIGH', organism: 'A. baumannii', color: 'bg-rose-500' },
+  { id: 6, top: '77%', left: '43%', city: 'Chennai', state: 'Tamil Nadu', risk: 'CRITICAL', organism: 'C. auris', color: 'bg-rose-500' },
+  { id: 7, top: '64%', left: '37%', city: 'Hyderabad', state: 'Telangana', risk: 'HIGH', organism: 'A. baumannii', color: 'bg-rose-500' },
+  { id: 11, top: '87%', left: '30%', city: 'Kochi', state: 'Kerala', risk: 'CRITICAL', organism: 'K. pneumoniae', color: 'bg-rose-500' },
 
-  // East
-  { id: 8, top: '50%', left: '72%', city: 'Kolkata', state: 'West Bengal', risk: 'MEDIUM', organism: 'V. cholerae', color: 'bg-amber-500' },
-  { id: 14, top: '38%', left: '82%', city: 'Guwahati', state: 'Assam', risk: 'MEDIUM', organism: 'Shigella', color: 'bg-amber-500' },
+  // EAST
+  { id: 8, top: '47%', left: '69%', city: 'Kolkata', state: 'West Bengal', risk: 'MEDIUM', organism: 'V. cholerae', color: 'bg-amber-500' },
+  { id: 14, top: '35%', left: '80%', city: 'Guwahati', state: 'Assam', risk: 'MEDIUM', organism: 'Shigella', color: 'bg-amber-500' },
 ];
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b']; // Blue, Green, Amber
@@ -89,44 +91,48 @@ const NationalOverview: React.FC<{ onSelectReport: (r: AMRReport) => void }> = (
              <MapPin className="mr-2 text-blue-600" size={20}/>
              Surveillance Map: Resistance Hotspots
            </h3>
-           <div className="bg-slate-50 rounded-lg h-[600px] relative overflow-hidden border border-slate-100 p-4 flex items-center justify-center">
-              <div className="relative h-full w-full max-w-[500px]">
-                  {/* Map Image - Using PNG for better reliability */}
+           
+           {/* MAP CONTAINER - Fixed Aspect Ratio for Accuracy */}
+           <div className="w-full flex justify-center bg-slate-50 rounded-xl border border-slate-100 py-4">
+              <div className="relative w-full max-w-[450px]" style={{ aspectRatio: '0.88' }}>
+                  {/* BASE MAP */}
                   <img 
                     src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bh/India_location_map.svg/862px-India_location_map.svg.png" 
                     alt="Map of India" 
-                    className="h-full w-full object-contain mix-blend-multiply opacity-90 z-0 relative" 
+                    className="w-full h-full object-contain mix-blend-multiply opacity-60 grayscale contrast-125" 
                   />
                   
+                  {/* OVERLAY GRID (Optional for tech feel) */}
+                  <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.05)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
+
                   {/* DYNAMIC MARKERS */}
                   {MAP_LOCATIONS.map((loc) => (
                     <div 
                         key={loc.id} 
-                        className="absolute group cursor-pointer z-10" 
+                        className="absolute group cursor-pointer z-10 transform -translate-x-1/2 -translate-y-1/2" 
                         style={{ top: loc.top, left: loc.left }}
                     >
-                        <div className="relative">
+                        <div className="relative flex items-center justify-center">
                             {/* Ping animation for Critical/High */}
                             {(loc.risk === 'CRITICAL' || loc.risk === 'HIGH') && (
-                                <div className={`absolute -inset-2 ${loc.color} rounded-full opacity-30 animate-ping`}></div>
+                                <div className={`absolute w-6 h-6 ${loc.color} rounded-full opacity-40 animate-ping`}></div>
                             )}
+                            
                             {/* The Dot */}
-                            <div className={`w-3 h-3 ${loc.color} border-2 border-white rounded-full shadow-lg`}></div>
+                            <div className={`w-3 h-3 ${loc.color} border-2 border-white rounded-full shadow-md z-20 hover:scale-125 transition-transform`}></div>
                             
                             {/* Tooltip */}
-                            <div className="absolute left-4 bottom-4 bg-white p-3 rounded-lg shadow-xl border border-slate-100 w-48 opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none transform translate-y-2 group-hover:translate-y-0 duration-200">
-                                <p className="text-xs font-bold text-slate-800">{loc.city}, {loc.state}</p>
-                                <div className="flex justify-between items-center mt-2 border-t border-slate-50 pt-2">
-                                    <span className="text-[10px] text-slate-500 uppercase tracking-wide">Bacteria</span>
-                                    <span className="text-[10px] font-medium text-slate-700">{loc.organism}</span>
-                                </div>
-                                <div className="flex justify-between items-center mt-1">
-                                    <span className="text-[10px] text-slate-500 uppercase tracking-wide">Alert</span>
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                        loc.risk === 'CRITICAL' || loc.risk === 'HIGH' ? 'bg-rose-100 text-rose-700' :
-                                        loc.risk === 'MEDIUM' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white p-3 rounded-lg shadow-xl w-48 opacity-0 group-hover:opacity-100 transition-all z-50 pointer-events-none scale-95 group-hover:scale-100 origin-bottom">
+                                <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-900"></div>
+                                <div className="flex justify-between items-start mb-1">
+                                    <p className="text-sm font-bold">{loc.city}</p>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ml-2 ${
+                                        loc.risk === 'CRITICAL' || loc.risk === 'HIGH' ? 'bg-rose-500 text-white' :
+                                        loc.risk === 'MEDIUM' ? 'bg-amber-500 text-white' : 'bg-green-500 text-white'
                                     }`}>{loc.risk}</span>
                                 </div>
+                                <p className="text-[10px] text-slate-300 font-medium mb-1">{loc.organism}</p>
+                                <p className="text-[9px] text-slate-400 uppercase tracking-wide">{loc.state}</p>
                             </div>
                         </div>
                     </div>

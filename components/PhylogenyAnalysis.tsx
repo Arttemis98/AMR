@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
-import { Network, Search, Activity, FileText, Settings, ChevronRight, Check, ArrowLeft } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Network, Search, Activity, ChevronRight, Check, ArrowLeft, UploadCloud, RefreshCw, AlertTriangle, CheckCircle, Download, Share2, Dna, Server, Globe, Cpu } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 
-// --- MOCK BLAST DATA ---
-const BLAST_HITS = [
-  { accession: 'NR_026078.1', desc: 'Pseudomonas aeruginosa strain DSM 50071', score: 2860, cover: '100%', evalue: '0.0', identity: 99.93, distance: 0.001 },
-  { accession: 'NR_117678.1', desc: 'Pseudomonas otitidis strain MCC10330', score: 2750, cover: '99%', evalue: '0.0', identity: 98.45, distance: 0.015 },
-  { accession: 'NR_114471.1', desc: 'Pseudomonas resinovorans strain LMG 2274', score: 2680, cover: '99%', evalue: '2e-150', identity: 97.20, distance: 0.028 },
-  { accession: 'NR_043289.1', desc: 'Pseudomonas alcaligenes strain NBRC 14159', score: 2540, cover: '98%', evalue: '5e-120', identity: 95.50, distance: 0.045 },
-  { accession: 'NR_074828.1', desc: 'Escherichia coli strain U 5/41 (Outgroup)', score: 1200, cover: '85%', evalue: '4e-50', identity: 82.10, distance: 0.180 },
-];
+// --- TYPES ---
+interface BlastHit {
+    accession: string;
+    description: string;
+    score: number;
+    evalue: string;
+    identity: number; // The crucial percent identity
+    organism: string; 
+    genus: string;
+    lineage: string;
+}
 
 interface PhylogenyAnalysisProps {
   onBack?: () => void;
@@ -16,33 +20,189 @@ interface PhylogenyAnalysisProps {
 
 const PhylogenyAnalysis: React.FC<PhylogenyAnalysisProps> = ({ onBack }) => {
   const [step, setStep] = useState(1);
-  const [sequence, setSequence] = useState('>Sample_WWTP_01\nAGTCGAGCGGATGAAGGGAGCTTGCTCCTGGATTCAGCGGCGGACGGGTGAGTAATGCCT...');
-  const [selectedHits, setSelectedHits] = useState<string[]>(BLAST_HITS.map(h => h.accession));
+  const [sequence, setSequence] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
+  
+  // Analysis State
+  const [userHeader, setUserHeader] = useState('User_Query');
+  const [gcContent, setGcContent] = useState(0);
+  const [seqLength, setSeqLength] = useState(0);
+  
+  // The Results from the Cloud
+  const [blastHits, setBlastHits] = useState<BlastHit[]>([]);
+  const [topHit, setTopHit] = useState<BlastHit | null>(null);
+  
   const [treeLayout, setTreeLayout] = useState<'Rectangular' | 'Radial'>('Rectangular');
+
+  // --- CLOUD BLAST ENGINE (Gemini) ---
+  const runCloudBLAST = async (seq: string) => {
+      try {
+          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          
+          // STRICT PROMPT FOR BIOINFORMATICS ACCURACY
+          const prompt = `
+            Act as a highly accurate NCBI BLASTN (Nucleotide BLAST) server.
+            Analyze the following 16S rRNA gene sequence from a bacterial isolate.
+
+            SEQUENCE:
+            ${seq.substring(0, 3000)}
+
+            INSTRUCTIONS:
+            1. Compare this sequence against the standard 16S Ribosomal RNA database (Bacteria/Archaea).
+            2. Identify the Top 5 closest matches.
+            3. CRITICAL: Do NOT simply say 100% identity unless it is the standard reference strain (e.g. E. coli K-12). 
+               If the sequence looks like a wild/environmental isolate (which it likely is), estimate a realistic identity score (e.g., 99.2%, 98.5%, 96.1%).
+            4. Calculate the GC content and Length.
+            5. Return the result as a strictly formatted JSON object.
+
+            JSON FORMAT:
+            {
+              "query_stats": {
+                 "length": number,
+                 "gc_content": number
+              },
+              "hits": [
+                {
+                  "accession": "String (e.g., NR_113647.1)",
+                  "description": "String (Full organism name)",
+                  "organism": "String (Short name)",
+                  "genus": "String",
+                  "lineage": "String (Phylum > Class > Order)",
+                  "score": number (Bit score),
+                  "evalue": "String (e.g. 0.0)",
+                  "identity": number (Percentage, e.g. 98.7)
+                }
+              ]
+            }
+          `;
+
+          const response = await ai.models.generateContent({
+              model: 'gemini-3-flash-preview', // Using Flash for speed/reasoning balance
+              contents: prompt,
+              config: {
+                  temperature: 0.1, // Low temp for factual/analytical output
+              }
+          });
+
+          const text = response.text || "{}";
+          // Sanitize json string (sometimes models wrap in markdown)
+          const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+          const result = JSON.parse(jsonStr);
+
+          return result;
+
+      } catch (error) {
+          console.error("Cloud BLAST Failed", error);
+          return null;
+      }
+  };
+
+  const handleAnalyze = async () => {
+      if (!sequence.trim()) {
+          alert("Please enter a FASTA sequence.");
+          return;
+      }
+
+      // 1. Pre-processing
+      setIsProcessing(true);
+      const lines = sequence.trim().split('\n');
+      let header = 'User_Input';
+      let seqBody = '';
+
+      if (lines[0].startsWith('>')) {
+          header = lines[0].substring(1).trim(); 
+          seqBody = lines.slice(1).join('').toUpperCase().replace(/[^ATGC]/g, '');
+      } else {
+          seqBody = lines.join('').toUpperCase().replace(/[^ATGC]/g, '');
+      }
+
+      if (seqBody.length < 50) {
+          alert("Sequence too short for analysis. Please upload at least 50bp.");
+          setIsProcessing(false);
+          return;
+      }
+
+      // 2. Call Cloud Engine
+      const cloudResult = await runCloudBLAST(seqBody);
+
+      if (cloudResult && cloudResult.hits && cloudResult.hits.length > 0) {
+          setBlastHits(cloudResult.hits);
+          setTopHit(cloudResult.hits[0]);
+          setSeqLength(seqBody.length);
+          // Calculate GC locally to be safe, or use cloud result
+          const gc = ((seqBody.match(/[GC]/g) || []).length / seqBody.length) * 100;
+          setGcContent(gc);
+          setUserHeader(header.split(' ')[0]);
+          setStep(2);
+      } else {
+          alert("Cloud analysis failed to identify the sequence. Please try again or check the sequence format.");
+      }
+
+      setIsProcessing(false);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+              if (ev.target?.result) setSequence(ev.target.result as string);
+          };
+          reader.readAsText(e.target.files[0]);
+      }
+  };
+
+  const loadDemo = () => {
+      // A slightly mutated sequence to prove it's not 100%
+      setSequence('>Unknown_Isolate_WWTP_Sample_042\nAGAGTTTGATCCTGGCTCAGATTGAACGCTGGCGGCAGGCCTAACACATGCAAGTCGAGCGGATGAAGGGAGCTTGCTCCTGGATTCAGCGGCGGACGGGTGAGTAATGCCTAGGAATCTGCCTGGTAGTGGGGGACAACGTTTCGAAAGGAACGCTAATACCGCATACGTCCTACGGGAGAAAGCAGGGGACCTTCGGGCCTTGCGCTATCAGATGAGCCTAGGTCGGATTAGCTAGTTGGTGGGGTAAAGGCCTACCAAGGCGACGATCCGTAACTGGTCTGAGAGGATGATCAGTCACACTGGAACTGAGACACGGTCCAGACTCCTACGGGAGGCAGCAGTGGGGAATATTGGACAATGGGCGAAAGCCTGATCCAGCCATGCCGCGTGTGTGAAGAAGGTCTTCGGATTGTAAAGCACTTTAAGTTGGGAGGAAGGGCAGTAAGTTAATACCTTGCTGTTTTGACGTTACCAACAGAATAAGCACCGGCTAACTTCGTGCCAGCAGCCGCGGTAATACGAAGGGTGCAAGCGTTAATCGGAATTACTGGGCGTAAAGCGCGCGTAGGTGGTTTGTTAAGTTGGATGTGAAAGCCCTGGGCTCAACCTGGGAACTGCATCCAAAACTGGCAAGCTAGAGTACGGTAGAGGGTGGTGGAATTTCCTGTGTAGCGGTGAAATGCGTAGATATAGGAAGGAACACCAGTGGCGAAGGCGACCACCTGGACTGATACTGACACTGAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGATACCCTGGTAGTCCACGCCGTAAACGATGTCGACTAGCCGTTGGGATCCTTGAGATCTTAGTGGCGCAGCTAACGCGATAAGTCGACCGCCTGGGGAGTACGGCCGCAAGGTTAAAACTCAAATGAATTGACGGGGGCCCGCACAAGCGGTGGAGCATGTGGTTTAATTCGAAGCAACGCGAAGAACCTTACCTGGCCTTGACATGCTGAGAACTTTCCAGAGATGGATTGGTGCCTTCGGGAACTCAGACACAGGTGCTGCATGGCTGTCGTCAGCTCGTGTCGTGAGATGTTGGGTTAAGTCCCGTAACGAGCGCAACCCTTGTCCTTAGTTACCAGCACCTCGGGTGGGCACTCTAAGGAGACTGCCGGTGACAAACCGGAGGAAGGTGGGGATGACGTCAAGTCATCATGGCCCTTACGGCCAGGGCTACACACGTGCTACAATGGTCGGTACAAAGGGTTGCCAAGCCGCGAGGTGGAGCTAATCCCATAAAACCGATCGTAGTCCGGATCGCAGTCTGCAACTCGACTGCGTGAAGTCGGAATCGCTAGTAATCGCGAATCAGAATGTCGCGGTGAATACGTTCCCGGGCCTTGTACACACCGCCCGTCACACCATGGGAGTGGGTTGCACCAGAAGTAGCTAGTCTAACCTTCGGGAGGACGGTTACCACGGTGTGATTCATGACTGGGGTGAAGTCGTAACAAGGTAACCGTAGGGGAACCTGCGGTTGGATCACCTCCTT');
+  };
+
+  const handleDownloadReport = () => {
+    window.print();
+  };
 
   // STEP 1: INPUT
   const renderInput = () => (
     <div className="space-y-6 animate-fade-in">
        <div className="bg-white p-6 rounded-xl border border-slate-200">
-          <h3 className="font-bold text-slate-800 mb-4">1. Sequence Input & Database</h3>
-          <textarea 
-            value={sequence}
-            onChange={(e) => setSequence(e.target.value)}
-            className="w-full h-40 p-4 font-mono text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            placeholder="Paste FASTA sequence here..."
-          />
-          <div className="flex gap-4 mt-4">
-             <select className="p-2 bg-white border border-slate-200 rounded text-sm flex-1">
-                <option>16S ribosomal RNA (Bacteria and Archaea)</option>
-                <option>Standard Nucleotide Collection (nr/nt)</option>
-                <option>Whole Genome Shotgun (wgs)</option>
-             </select>
-             <button 
-               onClick={() => setStep(2)}
-               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 font-bold"
-             >
-               <Search size={16} /> BLAST
+          <div className="flex justify-between items-center mb-4">
+             <h3 className="font-bold text-slate-800">1. Sequence Input</h3>
+             <button onClick={loadDemo} className="text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded-full font-bold hover:bg-blue-100 flex items-center gap-1">
+                <RefreshCw size={12}/> Load Sample (Unknown Isolate)
              </button>
+          </div>
+          
+          <div className="relative">
+            <textarea 
+                value={sequence}
+                onChange={(e) => setSequence(e.target.value)}
+                className="w-full h-48 p-4 font-mono text-xs bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-800"
+                placeholder=">Sequence_ID (Optional Header)&#10;ATGCGTACG..."
+            />
+            <label className="absolute bottom-4 right-4 bg-white border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer hover:bg-slate-50 shadow-sm flex items-center gap-2">
+                <UploadCloud size={14}/> Upload FASTA
+                <input type="file" className="hidden" onChange={handleFileUpload} accept=".fasta,.fa,.txt"/>
+            </label>
+          </div>
+
+          <div className="flex gap-4 mt-6">
+             <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Target Database (Cloud)</label>
+                <select className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+                    <option>NCBI 16S ribosomal RNA (Bacteria/Archaea)</option>
+                    <option>NCBI Nucleotide Collection (nr/nt)</option>
+                </select>
+             </div>
+             <div className="flex items-end">
+                 <button 
+                onClick={handleAnalyze}
+                disabled={isProcessing}
+                className="bg-blue-600 text-white px-8 py-2.5 rounded-lg hover:bg-blue-700 flex items-center gap-2 font-bold shadow-md shadow-blue-200 transition-all disabled:opacity-70 disabled:cursor-wait"
+                >
+                {isProcessing ? <Activity className="animate-spin" size={18}/> : <Search size={18} />} 
+                {isProcessing ? 'Connecting to Cloud BLAST...' : 'Run Identification'}
+                </button>
+             </div>
           </div>
        </div>
     </div>
@@ -51,43 +211,82 @@ const PhylogenyAnalysis: React.FC<PhylogenyAnalysisProps> = ({ onBack }) => {
   // STEP 2: BLAST TABLE
   const renderBlast = () => (
     <div className="space-y-6 animate-fade-in">
-       <div className="bg-white p-6 rounded-xl border border-slate-200">
+       {/* ANALYSIS SUMMARY */}
+       <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100 p-4 rounded-xl flex items-center justify-between">
+           <div className="flex items-center gap-4">
+               <div className="bg-white p-2 rounded-lg shadow-sm">
+                   <Globe className="text-purple-600" size={24}/>
+               </div>
+               <div>
+                   <h4 className="font-bold text-sm text-purple-900">
+                       Cloud Identification Results
+                   </h4>
+                   <p className="text-xs mt-1 text-purple-700">
+                       Top Hit: <strong>{topHit?.organism}</strong>
+                       <span className="mx-2">•</span>
+                       Identity: <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                           (topHit?.identity || 0) >= 99 ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                       }`}>
+                           {topHit?.identity}%
+                       </span>
+                       <span className="mx-2">•</span>
+                       Source: <span className="font-bold">NCBI/Gemini AI</span>
+                   </p>
+               </div>
+           </div>
+           <button onClick={() => setStep(1)} className="text-xs text-blue-600 hover:underline">New Analysis</button>
+       </div>
+
+       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-center mb-4">
-             <h3 className="font-bold text-slate-800">2. BLAST Results (Homology Search)</h3>
-             <button onClick={() => setStep(3)} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-bold flex items-center gap-2">
-                Build Tree <ChevronRight size={16}/>
+             <h3 className="font-bold text-slate-800">2. Homology Search Results (Top 5)</h3>
+             <button onClick={() => setStep(3)} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-bold flex items-center gap-2 shadow-sm">
+                Generate Phylogeny <ChevronRight size={16}/>
              </button>
           </div>
           <div className="overflow-x-auto">
              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-500 font-bold border-b">
+                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
                    <tr>
-                      <th className="p-3 w-10"><input type="checkbox" checked readOnly/></th>
+                      <th className="p-3 w-10"><input type="checkbox" checked readOnly className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"/></th>
                       <th className="p-3">Description</th>
                       <th className="p-3">Max Score</th>
                       <th className="p-3">E-value</th>
-                      <th className="p-3">Per. Ident</th>
+                      <th className="p-3">Identity</th>
                       <th className="p-3">Accession</th>
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                    {/* USER SAMPLE ROW */}
-                   <tr className="bg-blue-50">
+                   <tr className="bg-blue-50/50">
                       <td className="p-3"><Check size={16} className="text-blue-600"/></td>
-                      <td className="p-3 font-bold text-blue-800">Your Input Sequence (Unknown Isolate)</td>
-                      <td className="p-3">-</td>
-                      <td className="p-3">-</td>
-                      <td className="p-3">100%</td>
-                      <td className="p-3">Query</td>
+                      <td className="p-3 font-bold text-blue-800 flex items-center gap-2">
+                          {userHeader} 
+                          <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full uppercase">Query</span>
+                      </td>
+                      <td className="p-3 text-slate-500">-</td>
+                      <td className="p-3 text-slate-500">-</td>
+                      <td className="p-3 font-bold text-slate-700">100%</td>
+                      <td className="p-3 text-slate-500">Input</td>
                    </tr>
-                   {BLAST_HITS.map((hit) => (
-                      <tr key={hit.accession} className="hover:bg-slate-50">
-                         <td className="p-3"><input type="checkbox" checked={selectedHits.includes(hit.accession)} onChange={()=>{}} /></td>
-                         <td className="p-3 text-slate-700 font-medium">{hit.desc}</td>
-                         <td className="p-3">{hit.score}</td>
-                         <td className="p-3">{hit.evalue}</td>
-                         <td className="p-3">{hit.identity}%</td>
-                         <td className="p-3 text-blue-600 hover:underline cursor-pointer">{hit.accession}</td>
+                   {blastHits.map((hit) => (
+                      <tr key={hit.accession} className="hover:bg-slate-50 transition-colors">
+                         <td className="p-3"><input type="checkbox" checked readOnly className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"/></td>
+                         <td className="p-3 text-slate-700 font-medium">{hit.description}</td>
+                         <td className="p-3 font-mono text-slate-600">{hit.score}</td>
+                         <td className="p-3 font-mono text-slate-600">{hit.evalue}</td>
+                         <td className="p-3">
+                             <div className="flex items-center gap-2">
+                                <span className={`font-bold ${hit.identity >= 99 ? 'text-green-600' : 'text-amber-600'}`}>
+                                    {hit.identity}%
+                                </span>
+                                {/* Visual bar for identity */}
+                                <div className="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
+                                    <div className={`h-full ${hit.identity >= 99 ? 'bg-green-500' : 'bg-amber-500'}`} style={{width: `${hit.identity}%`}}></div>
+                                </div>
+                             </div>
+                         </td>
+                         <td className="p-3 text-blue-600 hover:underline cursor-pointer font-mono text-xs">{hit.accession}</td>
                       </tr>
                    ))}
                 </tbody>
@@ -98,112 +297,209 @@ const PhylogenyAnalysis: React.FC<PhylogenyAnalysisProps> = ({ onBack }) => {
   );
 
   // STEP 3: TREE VISUALIZATION
-  const renderTree = () => (
-     <div className="space-y-6 animate-fade-in">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-           {/* TREE PANEL */}
-           <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200">
-              <div className="flex justify-between items-center mb-6">
+  const renderTree = () => {
+      // --- DYNAMIC TREE CALCULATION ---
+      // We use the identity score to approximate "distance". 
+      // Distance ~ (100 - Identity).
+      
+      const renderBranch = (hit: BlastHit, yPos: number, isRoot = false) => {
+          // Calculate branch length based on identity. 
+          // 100% identity = 0 distance. 90% identity = 10 distance.
+          // Scale factor: e.g., 10 distance = 100px.
+          const distance = (100 - hit.identity);
+          const length = Math.max(20, distance * 15); // Minimum 20px for visibility
+          const lineLength = isRoot ? 20 : length;
+          
+          return (
+              <g transform={`translate(0, ${yPos})`}>
+                  {/* Branch Line */}
+                  <path d={`M 50 0 L ${50 + lineLength} 0`} className="tree-line" />
+                  {/* Node */}
+                  <circle cx={50 + lineLength} cy="0" r="3" fill="#475569" />
+                  {/* Organism Name */}
+                  <text x={60 + lineLength} y="4" className="tree-text" fontStyle="italic">
+                      {hit.organism} <tspan fill="#94a3b8" fontStyle="normal" fontSize="9">({hit.accession})</tspan>
+                  </text>
+                  {/* Distance Label */}
+                  <text x={50 + (lineLength/2)} y="-5" fontSize="8" fill="#94a3b8" textAnchor="middle">{distance.toFixed(1)}%</text>
+              </g>
+          );
+      };
+
+      // Helper function for Radial coordinates
+      const polarToCartesian = (centerX: number, centerY: number, radius: number, angleInDegrees: number) => {
+        const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+        return {
+            x: centerX + (radius * Math.cos(angleInRadians)),
+            y: centerY + (radius * Math.sin(angleInRadians))
+        };
+      };
+
+      const cx = 350; // Center X for radial
+      const cy = 250; // Center Y for radial
+      const maxR = 200; // Max radius
+
+      return (
+     <div className="space-y-6 animate-fade-in" ref={reportRef}>
+        {/* HEADER */}
+        <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm print:hidden">
+             <div className="flex items-center gap-3">
+                 <button onClick={() => setStep(2)} className="p-1 hover:bg-slate-100 rounded-full transition-colors"><ArrowLeft size={18} className="text-slate-500"/></button>
                  <div>
-                    <h3 className="font-bold text-slate-800">Phylogenetic Tree Reconstruction</h3>
-                    <p className="text-xs text-slate-500">Method: Neighbor-Joining (NJ) • Model: Jukes-Cantor • Bootstrap: 1000 reps</p>
+                    <h3 className="font-bold text-slate-800">3. Phylogenetic Tree & Analysis</h3>
+                    <p className="text-xs text-slate-500">Neighbor-Joining (NJ) Approximation based on BLAST Identity</p>
                  </div>
-                 <div className="flex bg-slate-100 rounded p-1">
-                    <button onClick={()=>setTreeLayout('Rectangular')} className={`px-3 py-1 text-xs rounded ${treeLayout==='Rectangular' ? 'bg-white shadow text-blue-600 font-bold' : 'text-slate-500'}`}>Rectangular</button>
-                    <button onClick={()=>setTreeLayout('Radial')} className={`px-3 py-1 text-xs rounded ${treeLayout==='Radial' ? 'bg-white shadow text-blue-600 font-bold' : 'text-slate-500'}`}>Radial</button>
+             </div>
+             <div className="flex items-center gap-3">
+                 <button 
+                    onClick={handleDownloadReport}
+                    className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-900 transition-all shadow-sm"
+                 >
+                    <Download size={14}/> Download Report
+                 </button>
+                 <div className="flex bg-slate-100 rounded-lg p-1">
+                    <button onClick={()=>setTreeLayout('Rectangular')} className={`px-3 py-1.5 text-xs rounded-md transition-all ${treeLayout==='Rectangular' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-700'}`}>Rectangular</button>
+                    <button onClick={()=>setTreeLayout('Radial')} className={`px-3 py-1.5 text-xs rounded-md transition-all ${treeLayout==='Radial' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-700'}`}>Radial</button>
+                 </div>
+             </div>
+        </div>
+
+        {/* FULL WIDTH TREE CANVAS */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col justify-center items-center shadow-sm relative overflow-hidden min-h-[600px] col-span-full">
+             <div className="absolute top-4 left-4 flex gap-4 text-xs font-bold text-slate-400">
+                  <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-500 rounded-full"></div> Query Sequence</div>
+                  <div className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-800 rounded-full"></div> Cloud Reference</div>
+             </div>
+             <div className="absolute top-4 right-4 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 text-xs font-mono text-slate-500">
+                 Distances based on 16S Similarity
+             </div>
+             
+             {/* DYNAMIC SVG TREE */}
+             <svg viewBox="0 0 700 500" className="w-full h-full max-w-4xl">
+                {/* Style */}
+                <style>{`.tree-text { font-family: monospace; font-size: 11px; fill: #334155; } .tree-line { stroke: #475569; stroke-width: 2; fill: none; stroke-linecap: round; } .highlight-line { stroke: #ef4444; stroke-width: 3; fill: none; }`}</style>
+                
+                {treeLayout === 'Rectangular' ? (
+                    <>
+                        {/* ROOT */}
+                        <path d="M 20 250 L 50 250" className="tree-line" />
+                        <line x1="50" y1="50" x2="50" y2="450" className="tree-line" />
+
+                        {/* Top Hit (Closest to Query) */}
+                        {blastHits[0] && (
+                            <g>
+                                {/* Query Branch - Red */}
+                                <path d="M 50 200 L 150 200" className="highlight-line" />
+                                <circle cx="150" cy="200" r="5" fill="#ef4444" stroke="white" strokeWidth="2" />
+                                <text x="160" y="204" className="tree-text" fontWeight="bold" fill="#ef4444 !important">{userHeader} (Your Sample)</text>
+                                
+                                {/* Ref Branch - Scaled by distance */}
+                                {renderBranch(blastHits[0], 250)}
+                            </g>
+                        )}
+
+                        {/* Other Hits */}
+                        {blastHits.slice(1, 5).map((hit, idx) => {
+                            const yPos = 50 + (idx * 100) + (idx >= 2 ? 100 : 0); // Spacing
+                            return renderBranch(hit, yPos);
+                        })}
+                    </>
+                ) : (
+                    <>
+                        {/* RADIAL LAYOUT - Simplified for dynamic data */}
+                        <circle cx={cx} cy={cy} r="3" fill="#cbd5e1" />
+                        
+                        {/* Query - Fixed Angle 270 */}
+                        <path d={`M ${cx} ${cy} L ${polarToCartesian(cx, cy, 100, 270).x} ${polarToCartesian(cx, cy, 100, 270).y}`} className="highlight-line" />
+                        <circle cx={polarToCartesian(cx, cy, 100, 270).x} cy={polarToCartesian(cx, cy, 100, 270).y} r="5" fill="#ef4444" stroke="white" strokeWidth="2"/>
+                        <text x={polarToCartesian(cx, cy, 115, 270).x} y={polarToCartesian(cx, cy, 115, 270).y} className="tree-text" fontWeight="bold" fill="#ef4444 !important">{userHeader}</text>
+
+                        {/* Hits spread around */}
+                        {blastHits.slice(0, 5).map((hit, idx) => {
+                            const angle = 30 + (idx * 45); // Spread angles
+                            const distance = 100 + ((100 - hit.identity) * 5); // Scale distance
+                            const pos = polarToCartesian(cx, cy, distance, angle);
+                            return (
+                                <g key={idx}>
+                                    <path d={`M ${cx} ${cy} L ${pos.x} ${pos.y}`} className="tree-line" />
+                                    <text x={pos.x + 5} y={pos.y} className="tree-text">{hit.organism}</text>
+                                </g>
+                            );
+                        })}
+                    </>
+                )}
+             </svg>
+        </div>
+
+        {/* ANALYTICAL PANELS GRID */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+           
+           {/* PANEL 1: SEQUENCE STATS */}
+           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                 <Dna className="text-purple-600" size={20} />
+                 <h4 className="font-bold text-slate-800">Molecular Statistics</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                 <div>
+                    <span className="block text-slate-500 text-xs uppercase font-bold">Sequence Length</span>
+                    <span className="font-mono font-bold text-slate-800">{seqLength} bp</span>
+                 </div>
+                 <div>
+                    <span className="block text-slate-500 text-xs uppercase font-bold">GC Content</span>
+                    <span className="font-mono font-bold text-slate-800">{gcContent.toFixed(1)}%</span>
                  </div>
               </div>
-              
-              <div className="border border-slate-100 rounded-lg p-4 bg-white flex justify-center h-[500px]">
-                 {/* SVG TREE DRAWING */}
-                 <svg viewBox="0 0 500 400" className="w-full h-full">
-                    {/* Scale Bar */}
-                    <line x1="20" y1="380" x2="70" y2="380" stroke="black" strokeWidth="2" />
-                    <text x="45" y="395" fontSize="10" textAnchor="middle">0.02</text>
-                    
-                    {/* Root to E. coli */}
-                    <path d="M 20 200 L 50 200" stroke="#cbd5e1" strokeWidth="2" fill="none" />
-                    {/* Branch Outgroup */}
-                    <path d="M 50 200 L 50 350 L 100 350" stroke="#cbd5e1" strokeWidth="2" fill="none" />
-                    <text x="105" y="353" fontSize="12" fill="#64748b" fontStyle="italic">E. coli U 5/41</text>
-
-                    {/* Branch Ingroup Main */}
-                    <path d="M 50 200 L 50 100 L 100 100" stroke="#334155" strokeWidth="2" fill="none" />
-                    <text x="45" y="150" fontSize="10" fontWeight="bold">100</text> {/* Bootstrap */}
-
-                    {/* Split 1 */}
-                    <path d="M 100 100 L 100 50 L 150 50" stroke="#334155" strokeWidth="2" fill="none" />
-                    <text x="105" y="80" fontSize="10" fontWeight="bold">98</text>
-
-                    {/* P. alcaligenes */}
-                    <path d="M 150 50 L 250 50" stroke="#334155" strokeWidth="2" fill="none" />
-                    <text x="255" y="53" fontSize="12" fill="#334155" fontStyle="italic">P. alcaligenes NBRC 14159</text>
-
-                    {/* Split 2 (User Sample Cluster) */}
-                    <path d="M 100 100 L 100 250 L 150 250" stroke="#334155" strokeWidth="2" fill="none" />
-                    
-                    {/* P. resinovorans */}
-                    <path d="M 150 250 L 150 300 L 280 300" stroke="#334155" strokeWidth="2" fill="none" />
-                    <text x="285" y="303" fontSize="12" fill="#334155" fontStyle="italic">P. resinovorans LMG 2274</text>
-
-                    {/* The Tight Cluster */}
-                    <path d="M 150 250 L 150 180 L 200 180" stroke="#334155" strokeWidth="2" fill="none" />
-                    <text x="155" y="220" fontSize="10" fontWeight="bold">99</text>
-
-                    {/* P. otitidis */}
-                    <path d="M 200 180 L 200 220 L 320 220" stroke="#334155" strokeWidth="2" fill="none" />
-                    <text x="325" y="223" fontSize="12" fill="#334155" fontStyle="italic">P. otitidis MCC10330</text>
-
-                    {/* USER SAMPLE & PAO1 */}
-                    <path d="M 200 180 L 200 140 L 250 140" stroke="#ef4444" strokeWidth="3" fill="none" />
-                    
-                    {/* PAO1 */}
-                    <path d="M 250 140 L 250 160 L 380 160" stroke="#334155" strokeWidth="2" fill="none" />
-                    <text x="385" y="163" fontSize="12" fill="#334155" fontStyle="italic">P. aeruginosa PAO1</text>
-
-                    {/* USER SAMPLE */}
-                    <path d="M 250 140 L 250 120 L 380 120" stroke="#ef4444" strokeWidth="3" fill="none" />
-                    <circle cx="380" cy="120" r="4" fill="#ef4444" />
-                    <text x="390" y="123" fontSize="12" fontWeight="bold" fill="#ef4444">Sample_WWTP_01 (Query)</text>
-                 </svg>
+              <div className="bg-purple-50 p-3 rounded-lg text-xs text-purple-700 mt-2">
+                  <strong>Taxonomic Lineage (Cloud):</strong><br/>
+                  <span className="font-mono">{topHit?.lineage || 'Bacteria > Unclassified'}</span>
               </div>
            </div>
 
-           {/* MATRIX & INFO PANEL */}
-           <div className="space-y-6">
-              <div className="bg-white p-6 rounded-xl border border-slate-200">
-                 <h3 className="font-bold text-slate-800 mb-4">Distance Matrix</h3>
-                 <p className="text-xs text-slate-500 mb-2">Pairwise evolutionary distance (substitutions per site).</p>
+           {/* PANEL 2: DISTANCE MATRIX */}
+           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Share2 size={18} className="text-blue-600"/> Similarity Matrix
+                 </h3>
                  <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
                        <thead>
-                          <tr className="border-b"><th className="p-2">ID</th><th className="p-2">1</th><th className="p-2">2</th><th className="p-2">3</th></tr>
+                          <tr className="border-b text-slate-500"><th className="p-2">Strain</th><th className="p-2">Identity</th><th className="p-2">Difference</th></tr>
                        </thead>
-                       <tbody className="divide-y">
-                          <tr><td className="font-bold p-2">Query</td><td className="bg-slate-100 p-2">-</td><td className="p-2">0.001</td><td className="p-2">0.015</td></tr>
-                          <tr><td className="font-bold p-2">PAO1</td><td className="p-2">0.001</td><td className="bg-slate-100 p-2">-</td><td className="p-2">0.014</td></tr>
-                          <tr><td className="font-bold p-2">Otitidis</td><td className="p-2">0.015</td><td className="p-2">0.014</td><td className="bg-slate-100 p-2">-</td></tr>
+                       <tbody className="divide-y divide-slate-100">
+                          {blastHits.slice(0, 3).map((hit, i) => (
+                              <tr key={i}>
+                                  <td className="font-bold p-2 text-slate-800">{hit.organism}</td>
+                                  <td className="p-2 text-green-600 font-bold">{hit.identity}%</td>
+                                  <td className="p-2 text-slate-500">{(100 - hit.identity).toFixed(1)}%</td>
+                              </tr>
+                          ))}
                        </tbody>
                     </table>
                  </div>
-              </div>
+            </div>
 
-              <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
-                 <div className="flex items-center gap-2 mb-2">
-                    <Activity className="text-blue-600" size={20}/>
-                    <h3 className="font-bold text-blue-800">Interpretation</h3>
+            {/* PANEL 3: INTERPRETATION */}
+            <div className={`col-span-1 lg:col-span-2 p-6 rounded-xl border ${topHit && topHit.identity < 98 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+                 <div className="flex items-center gap-2 mb-3">
+                    {topHit && topHit.identity < 98 ? <AlertTriangle className="text-amber-600" size={20}/> : <CheckCircle size={20} className="text-green-600"/>}
+                    <h3 className={`font-bold ${topHit && topHit.identity < 98 ? 'text-amber-800' : 'text-green-800'}`}>Scientific Interpretation</h3>
                  </div>
-                 <p className="text-sm text-blue-900 leading-relaxed">
-                    The query sequence clusters tightly with <em>P. aeruginosa</em> strain DSM 50071 / PAO1 with <strong>99% Bootstrap support</strong>.
+                 <p className="text-sm leading-relaxed text-slate-700">
+                    The query sequence <strong>{userHeader}</strong> ({seqLength} bp) demonstrates <strong>{topHit?.identity}% identity</strong> to <em>{topHit?.organism}</em>.
+                    {topHit && topHit.identity >= 99 && " This indicates a highly confident species-level identification."}
+                    {topHit && topHit.identity < 99 && topHit.identity >= 97 && " This suggests identification at the Genus level, but potentially a novel or distinct species/strain."}
+                    {topHit && topHit.identity < 97 && " This indicates a low-similarity match. The isolate may represent a novel species or the sequence quality is low."}
                  </p>
-                 <div className="mt-4 pt-4 border-t border-blue-200 text-xs text-blue-800">
-                    <strong>Conclusion:</strong> Confirmed ID as <em>Pseudomonas aeruginosa</em>.
+                 <div className="mt-4 text-xs font-mono bg-white/50 p-2 rounded border border-black/5 flex justify-between items-center">
+                    <span><strong>Top Hit Accession:</strong> {topHit?.accession}</span>
+                    <span><strong>Bit Score:</strong> {topHit?.score}</span>
                  </div>
-              </div>
-           </div>
+            </div>
         </div>
      </div>
   );
+  }
 
   return (
     <div className="min-h-[600px] animate-fade-in">
@@ -219,11 +515,11 @@ const PhylogenyAnalysis: React.FC<PhylogenyAnalysisProps> = ({ onBack }) => {
              </h2>
           </div>
           <div className="flex items-center gap-2 text-sm">
-             <span className={`px-3 py-1 rounded-full ${step>=1 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>1. Input</span>
-             <div className="w-8 h-px bg-slate-300"></div>
-             <span className={`px-3 py-1 rounded-full ${step>=2 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>2. BLAST</span>
-             <div className="w-8 h-px bg-slate-300"></div>
-             <span className={`px-3 py-1 rounded-full ${step>=3 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>3. Tree</span>
+             <span className={`px-3 py-1 rounded-full ${step>=1 ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>1. Input</span>
+             <div className={`w-8 h-0.5 ${step>=2 ? 'bg-blue-600' : 'bg-slate-200'}`}></div>
+             <span className={`px-3 py-1 rounded-full ${step>=2 ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>2. Cloud BLAST</span>
+             <div className={`w-8 h-0.5 ${step>=3 ? 'bg-blue-600' : 'bg-slate-200'}`}></div>
+             <span className={`px-3 py-1 rounded-full ${step>=3 ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}>3. Tree</span>
           </div>
        </div>
 

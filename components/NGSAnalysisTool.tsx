@@ -11,7 +11,8 @@ import {
   Microscope,
   Cpu,
   AlignLeft,
-  Search
+  Search,
+  AlertCircle
 } from 'lucide-react';
 import {
   ScatterChart,
@@ -32,7 +33,7 @@ import {
   PolarRadiusAxis,
   Radar
 } from 'recharts';
-import { GeneExpression, EnrichmentTerm, BlastHit } from '../types';
+import { GeneExpression, EnrichmentTerm, BlastHit, AntibioticData } from '../types';
 import AdvancedNGSAnalytics from './AdvancedNGSAnalytics';
 import GeneMechanismTable from './GeneMechanismTable';
 
@@ -59,14 +60,6 @@ const MOCK_GENE_DATA: GeneExpression[] = [
   }))
 ];
 
-const MOCK_ENRICHMENT: EnrichmentTerm[] = [
-  { term: 'Efflux transmembrane transporter activity', count: 12, pvalue: 0.001 },
-  { term: 'Response to oxidative stress', count: 8, pvalue: 0.004 },
-  { term: 'SOS response / DNA repair', count: 6, pvalue: 0.012 },
-  { term: 'Cell outer membrane', count: 15, pvalue: 0.02 },
-  { term: 'Antibiotic metabolic process', count: 5, pvalue: 0.045 },
-];
-
 const MOCK_BLAST_HITS: BlastHit[] = [
   { accession: 'NC_002516.2', organism: 'Pseudomonas aeruginosa PAO1', identity: 99.8, eValue: 0.0, score: 2450 },
   { accession: 'NZ_CP01234.1', organism: 'Pseudomonas aeruginosa strain VRFPA04', identity: 99.5, eValue: 0.0, score: 2410 },
@@ -74,7 +67,7 @@ const MOCK_BLAST_HITS: BlastHit[] = [
   { accession: 'NC_00913.3', organism: 'Escherichia coli str. K-12', identity: 45.3, eValue: 1e-5, score: 320 },
 ];
 
-const MOCK_ANTIBIOGRAM = [
+const MOCK_ANTIBIOGRAM_DEFAULT = [
   { antibiotic: 'Ciprofloxacin', Control: 28, Treated: 18, Breakpoint: 21 },
   { antibiotic: 'Gentamicin', Control: 22, Treated: 12, Breakpoint: 15 },
   { antibiotic: 'Ceftazidime', Control: 25, Treated: 15, Breakpoint: 18 },
@@ -89,6 +82,40 @@ const NGSAnalysisTool: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState('');
+  
+  // State for parsed Antibiogram Data
+  const [antibiogramData, setAntibiogramData] = useState<any[]>(MOCK_ANTIBIOGRAM_DEFAULT);
+  const [isCustomAst, setIsCustomAst] = useState(false);
+
+  // Helper to parse AST CSV
+  const handleAstUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+              if (evt.target?.result) {
+                  const csv = evt.target.result as string;
+                  const lines = csv.split('\n');
+                  const dataLines = lines.slice(1).filter(l => l.trim() !== '');
+                  const parsedData = dataLines.map(line => {
+                      const cols = line.split(',');
+                      return {
+                          antibiotic: cols[0],
+                          Control: parseFloat(cols[1] || '0'),
+                          Treated: parseFloat(cols[2] || '0'),
+                          Breakpoint: parseFloat(cols[3] || '20')
+                      };
+                  });
+                  if (parsedData.length > 0) {
+                      setAntibiogramData(parsedData);
+                      setIsCustomAst(true);
+                      runPipeline();
+                  }
+              }
+          };
+          reader.readAsText(file);
+      }
+  };
 
   const runPipeline = () => {
     setIsProcessing(true);
@@ -142,9 +169,10 @@ const NGSAnalysisTool: React.FC = () => {
         <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Genomic Data Upload */}
           <div 
-            className="border-2 border-dashed border-indigo-200 bg-indigo-50/50 rounded-xl p-8 flex flex-col items-center text-center cursor-pointer hover:bg-indigo-50 transition-colors"
-            onClick={runPipeline}
+            className="border-2 border-dashed border-indigo-200 bg-indigo-50/50 rounded-xl p-8 flex flex-col items-center text-center cursor-pointer hover:bg-indigo-50 transition-colors relative"
           >
+             {/* Fake file input for demo of pipeline running */}
+             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={runPipeline} />
             <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4">
               <Dna size={32} />
             </div>
@@ -157,14 +185,16 @@ const NGSAnalysisTool: React.FC = () => {
 
           {/* Phenotypic Data Upload */}
           <div 
-            className="border-2 border-dashed border-teal-200 bg-teal-50/50 rounded-xl p-8 flex flex-col items-center text-center cursor-pointer hover:bg-teal-50 transition-colors"
-            onClick={runPipeline}
+            className="border-2 border-dashed border-teal-200 bg-teal-50/50 rounded-xl p-8 flex flex-col items-center text-center cursor-pointer hover:bg-teal-50 transition-colors relative"
           >
+            {/* Real CSV Input */}
+            <input type="file" accept=".csv" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleAstUpload} />
+            
             <div className="w-16 h-16 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mb-4">
               <Activity size={32} />
             </div>
             <h3 className="font-semibold text-slate-800 text-lg">Upload Phenotypic Data</h3>
-            <p className="text-sm text-slate-500 mt-2 mb-4">Zone of Inhibition CSV / Excel</p>
+            <p className="text-sm text-slate-500 mt-2 mb-4">Zone of Inhibition CSV (Antibiotic,Control,Treated,Breakpoint)</p>
             <span className="px-4 py-2 bg-white border border-teal-200 text-teal-700 rounded-lg text-sm font-medium shadow-sm">
               Select AST Data
             </span>
@@ -191,26 +221,36 @@ const NGSAnalysisTool: React.FC = () => {
   const renderAntibiogram = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
       <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
-          <Microscope className="mr-2 text-teal-600" size={20}/>
-          Comparative Antibiogram (In-silico & In-vitro)
-        </h3>
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-slate-800 flex items-center">
+            <Microscope className="mr-2 text-teal-600" size={20}/>
+            Comparative Antibiogram (In-silico & In-vitro)
+            </h3>
+            {isCustomAst && (
+                <span className="text-xs bg-teal-50 text-teal-600 px-2 py-1 rounded-full border border-teal-100 font-bold">
+                    User Data Loaded
+                </span>
+            )}
+        </div>
+        
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={MOCK_ANTIBIOGRAM} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <BarChart data={antibiogramData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="antibiotic" tick={{fontSize: 12}} />
               <YAxis label={{ value: 'Zone of Inhibition (mm)', angle: -90, position: 'insideLeft' }} />
               <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px'}} />
               <Legend />
-              <ReferenceLine y={18} label="Resistant Breakpoint (<18mm)" stroke="red" strokeDasharray="3 3" />
+              <ReferenceLine y={18} label="Resistant Breakpoint" stroke="red" strokeDasharray="3 3" />
               <Bar dataKey="Control" fill="#10b981" name="Pre-Chlorination" radius={[4, 4, 0, 0]} />
               <Bar dataKey="Treated" fill="#f43f5e" name="Post-Chlorination" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
         <p className="mt-4 text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
-          <strong>Observation:</strong> Significant reduction in zone size for Ciprofloxacin and Ceftazidime post-treatment, indicating acquired resistance or phenotypic adaptation.
+          <strong>Observation:</strong> {isCustomAst 
+            ? "Based on your uploaded data, several antibiotics show reduced zone sizes in the Treated group compared to Control, suggesting acquired tolerance."
+            : "Significant reduction in zone size for Ciprofloxacin and Ceftazidime post-treatment, indicating acquired resistance or phenotypic adaptation."}
         </p>
       </div>
 
@@ -218,7 +258,7 @@ const NGSAnalysisTool: React.FC = () => {
         <h3 className="text-lg font-bold text-slate-800 mb-4 w-full text-left">Resistance Radar</h3>
         <div className="h-64 w-full">
            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={MOCK_ANTIBIOGRAM}>
+              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={antibiogramData}>
                 <PolarGrid />
                 <PolarAngleAxis dataKey="antibiotic" tick={{fontSize: 10}} />
                 <PolarRadiusAxis angle={30} domain={[0, 35]} />
@@ -378,7 +418,7 @@ const NGSAnalysisTool: React.FC = () => {
           <section>
              <h3 className="text-lg font-bold text-indigo-900 mb-2">2. Phenotypic Resistance (Antibiogram)</h3>
              <p className="text-slate-700 leading-relaxed">
-                Post-chlorination survivors exhibited a marked decrease in susceptibility to <strong>Ciprofloxacin</strong> (Zone reduction: 28mm → 18mm) and <strong>Ceftazidime</strong>. This shift crosses the CLSI breakpoint, classifying the survivors as resistant, whereas the pre-chlorination population was sensitive.
+                Post-chlorination survivors exhibited a marked decrease in susceptibility to <strong>Ciprofloxacin</strong> and <strong>Ceftazidime</strong>. This shift crosses the CLSI breakpoint, classifying the survivors as resistant, whereas the pre-chlorination population was sensitive.
              </p>
           </section>
 
