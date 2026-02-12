@@ -1,7 +1,7 @@
+
 import React, { useState } from 'react';
 import { 
   UploadCloud, 
-  FileSpreadsheet, 
   Dna, 
   Activity, 
   CheckCircle, 
@@ -10,9 +10,25 @@ import {
   FileText,
   Microscope,
   Cpu,
-  AlignLeft,
   Search,
-  AlertCircle
+  ArrowLeft,
+  ChevronRight,
+  Database,
+  Filter,
+  Zap,
+  Shield,
+  Layers,
+  Table,
+  LineChart as LineChartIcon,
+  Globe,
+  Play,
+  Download,
+  AlertTriangle,
+  Info,
+  ChevronDown,
+  // Add missing icons
+  Settings,
+  RefreshCw
 } from 'lucide-react';
 import {
   ScatterChart,
@@ -27,442 +43,532 @@ import {
   Bar,
   Cell,
   Legend,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar
+  AreaChart,
+  Area,
+  PieChart,
+  Pie
 } from 'recharts';
-import { GeneExpression, EnrichmentTerm, BlastHit, AntibioticData } from '../types';
-import AdvancedNGSAnalytics from './AdvancedNGSAnalytics';
-import GeneMechanismTable from './GeneMechanismTable';
+import { GeneExpression } from '../types';
 
-// --- MOCK DATA ---
+// --- TYPES ---
+type NGSToolType = 'WGS' | 'RNA_SEQ' | '16S' | 'METAGENOME';
+type WorkflowStep = 'SELECT' | 'CONFIG' | 'PROCESSING' | 'RESULTS';
 
-const MOCK_GENE_DATA: GeneExpression[] = [
-  { gene: 'mexA', log2FoldChange: 2.5, pvalue: 0.0001, significance: 'UP', function: 'Efflux Pump' },
-  { gene: 'mexB', log2FoldChange: 2.8, pvalue: 0.00001, significance: 'UP', function: 'Efflux Pump' },
-  { gene: 'oprM', log2FoldChange: 2.1, pvalue: 0.002, significance: 'UP', function: 'Outer Membrane Protein' },
-  { gene: 'recA', log2FoldChange: 3.2, pvalue: 0.000001, significance: 'UP', function: 'SOS Response' },
-  { gene: 'lexA', log2FoldChange: 1.5, pvalue: 0.01, significance: 'UP', function: 'SOS Repressor' },
-  { gene: 'rpoS', log2FoldChange: 1.8, pvalue: 0.005, significance: 'UP', function: 'Sigma Factor' },
-  { gene: 'oxyR', log2FoldChange: 1.2, pvalue: 0.03, significance: 'UP', function: 'Oxidative Stress' },
-  { gene: 'ompF', log2FoldChange: -2.1, pvalue: 0.001, significance: 'DOWN', function: 'Porin' },
-  { gene: 'rpsL', log2FoldChange: -0.5, pvalue: 0.4, significance: 'NS', function: 'Ribosomal Protein' },
-  { gene: 'gyrA', log2FoldChange: 0.2, pvalue: 0.8, significance: 'NS', function: 'DNA Gyrase' },
-  { gene: 'katG', log2FoldChange: 1.9, pvalue: 0.004, significance: 'UP', function: 'Catalase' },
-  ...Array.from({ length: 50 }, (_, i) => ({
-    gene: `gene_${i}`,
-    log2FoldChange: (Math.random() * 4) - 2,
-    pvalue: Math.random(),
-    significance: 'NS' as const,
-    function: 'Hypothetical'
-  }))
+interface Metadata {
+    sampleName: string;
+    instrument: string;
+    millionReads: string;
+    fileFormat: string;
+}
+
+// --- MOCK DATA GENERATORS ---
+const INSTRUMENTS = [
+    "Illumina NovaSeq 6000", "Illumina NextSeq 2000", "Illumina MiSeq",
+    "Oxford Nanopore MinION", "Oxford Nanopore GridION", "PacBio Sequel II"
 ];
 
-const MOCK_BLAST_HITS: BlastHit[] = [
-  { accession: 'NC_002516.2', organism: 'Pseudomonas aeruginosa PAO1', identity: 99.8, eValue: 0.0, score: 2450 },
-  { accession: 'NZ_CP01234.1', organism: 'Pseudomonas aeruginosa strain VRFPA04', identity: 99.5, eValue: 0.0, score: 2410 },
-  { accession: 'NC_011770.1', organism: 'Pseudomonas putida KT2440', identity: 88.2, eValue: 1e-120, score: 1800 },
-  { accession: 'NC_00913.3', organism: 'Escherichia coli str. K-12', identity: 45.3, eValue: 1e-5, score: 320 },
+const TAXONOMY_DATA = [
+    { name: 'Pseudomonadota', value: 45, color: '#3b82f6' },
+    { name: 'Bacteroidota', value: 25, color: '#10b981' },
+    { name: 'Bacillota', value: 15, color: '#f59e0b' },
+    { name: 'Actinomycetota', value: 10, color: '#8b5cf6' },
+    { name: 'Others', value: 5, color: '#94a3b8' },
 ];
 
-const MOCK_ANTIBIOGRAM_DEFAULT = [
-  { antibiotic: 'Ciprofloxacin', Control: 28, Treated: 18, Breakpoint: 21 },
-  { antibiotic: 'Gentamicin', Control: 22, Treated: 12, Breakpoint: 15 },
-  { antibiotic: 'Ceftazidime', Control: 25, Treated: 15, Breakpoint: 18 },
-  { antibiotic: 'Imipenem', Control: 30, Treated: 28, Breakpoint: 20 },
-  { antibiotic: 'Meropenem', Control: 29, Treated: 27, Breakpoint: 20 },
+const METAGENOME_RESISTOME = [
+    { class: 'Beta-lactams', abundance: 12.5, risk: 'CRITICAL' },
+    { class: 'Aminoglycosides', abundance: 8.2, risk: 'HIGH' },
+    { class: 'Fluoroquinolones', abundance: 5.4, risk: 'MEDIUM' },
+    { class: 'Tetracyclines', abundance: 15.1, risk: 'LOW' },
 ];
 
-type AnalysisTab = 'upload' | 'antibiogram' | 'phylogeny' | 'rnaseq' | 'report';
+const NGSAnalysisTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  const [workflow, setWorkflow] = useState<WorkflowStep>('SELECT');
+  const [toolType, setToolType] = useState<NGSToolType | null>(null);
+  const [metadata, setMetadata] = useState<Metadata>({
+      sampleName: '',
+      instrument: INSTRUMENTS[0],
+      millionReads: '25',
+      fileFormat: 'FASTQ'
+  });
+  const [processingLog, setProcessingLog] = useState<string[]>([]);
+  const [progress, setProgress] = useState(0);
+  const [pipelineConfidence, setPipelineConfidence] = useState(98.4);
 
-const NGSAnalysisTool: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<AnalysisTab>('upload');
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingStep, setProcessingStep] = useState('');
-  
-  // State for parsed Antibiogram Data
-  const [antibiogramData, setAntibiogramData] = useState<any[]>(MOCK_ANTIBIOGRAM_DEFAULT);
-  const [isCustomAst, setIsCustomAst] = useState(false);
-
-  // Helper to parse AST CSV
-  const handleAstUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files.length > 0) {
-          const file = e.target.files[0];
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-              if (evt.target?.result) {
-                  const csv = evt.target.result as string;
-                  const lines = csv.split('\n');
-                  const dataLines = lines.slice(1).filter(l => l.trim() !== '');
-                  const parsedData = dataLines.map(line => {
-                      const cols = line.split(',');
-                      return {
-                          antibiotic: cols[0],
-                          Control: parseFloat(cols[1] || '0'),
-                          Treated: parseFloat(cols[2] || '0'),
-                          Breakpoint: parseFloat(cols[3] || '20')
-                      };
-                  });
-                  if (parsedData.length > 0) {
-                      setAntibiogramData(parsedData);
-                      setIsCustomAst(true);
-                      runPipeline();
-                  }
-              }
-          };
-          reader.readAsText(file);
-      }
+  // --- ACTIONS ---
+  const handleSelectTool = (type: NGSToolType) => {
+    setToolType(type);
+    setWorkflow('CONFIG');
   };
 
-  const runPipeline = () => {
-    setIsProcessing(true);
-    setUploadProgress(0);
+  const startAnalysis = () => {
+    setWorkflow('PROCESSING');
+    setProgress(0);
+    setProcessingLog([]);
     
-    const steps = [
-      { pct: 10, msg: "Quality Control (FastQC) & Trimming..." },
-      { pct: 30, msg: "De novo Assembly & Contig Generation..." },
-      { pct: 50, msg: "Local BLAST Alignment & Identification..." },
-      { pct: 70, msg: "Phylogenetic Tree Construction (Maximum Likelihood)..." },
-      { pct: 85, msg: "Read Mapping (HISAT2) & Quantification..." },
-      { pct: 100, msg: "Differential Expression Analysis (DESeq2)..." }
-    ];
+    const steps = toolType === 'RNA_SEQ' 
+        ? ["FastQC Quality Check...", "Adapter Trimming (Trimmomatic)...", "Alignment (STAR/HISAT2)...", "Read Counting (featureCounts)...", "DGE Analysis (DESeq2)...", "Pathway Mapping (KEGG)..."]
+        : toolType === '16S'
+        ? ["Demultiplexing...", "Denoising (DADA2)...", "Chimera Removal...", "Taxonomic Assignment (SILVA)...", "Alpha/Beta Diversity Analysis...", "Generating PCoA Plot..."]
+        : toolType === 'WGS'
+        ? ["QC Filtering...", "De-novo Assembly (SPAdes)...", "Contig Polishing...", "Prokka Annotation...", "ResFinder Screening...", "MLST Typing..."]
+        : ["Host DNA Depletion...", "Metagenomic Assembly...", "Taxonomic Profiling (MetaPhlAn)...", "Functional Annotation...", "Resistome Quantification...", "Risk Assessment..."];
 
-    let currentStep = 0;
+    let current = 0;
     const interval = setInterval(() => {
-      setUploadProgress(steps[currentStep].pct);
-      setProcessingStep(steps[currentStep].msg);
-      currentStep++;
-      
-      if (currentStep >= steps.length) {
+      setProcessingLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${steps[current]}`]);
+      setProgress(p => Math.min(p + (100 / steps.length), 100));
+      current++;
+      if (current >= steps.length) {
         clearInterval(interval);
-        setTimeout(() => {
-          setIsProcessing(false);
-          setActiveTab('antibiogram');
-        }, 800);
+        setTimeout(() => setWorkflow('RESULTS'), 800);
       }
-    }, 1200);
+    }, 1000);
   };
 
-  const TabButton = ({ id, label, icon: Icon }: { id: AnalysisTab, label: string, icon: any }) => (
-    <button
-      onClick={() => setActiveTab(id)}
-      disabled={activeTab === 'upload' && id !== 'upload'} // Disable tabs until upload done
-      className={`flex items-center space-x-2 px-4 py-3 border-b-2 transition-colors ${
-        activeTab === id 
-          ? 'border-blue-600 text-blue-600 font-medium' 
-          : 'border-transparent text-slate-500 hover:text-slate-700'
-      } ${activeTab === 'upload' && id !== 'upload' ? 'opacity-50 cursor-not-allowed' : ''}`}
-    >
-      <Icon size={16} />
-      <span>{label}</span>
-    </button>
-  );
+  const goBack = () => {
+    if (workflow === 'RESULTS') setWorkflow('SELECT');
+    else if (workflow === 'CONFIG') setWorkflow('SELECT');
+    else onBack();
+  };
 
-  // --- SUB-COMPONENTS ---
+  // --- RENDERERS ---
 
-  const renderUpload = () => (
-    <div className="flex flex-col items-center justify-center min-h-[500px] p-8">
-      {!isProcessing ? (
-        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Genomic Data Upload */}
-          <div 
-            className="border-2 border-dashed border-indigo-200 bg-indigo-50/50 rounded-xl p-8 flex flex-col items-center text-center cursor-pointer hover:bg-indigo-50 transition-colors relative"
-          >
-             {/* Fake file input for demo of pipeline running */}
-             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={runPipeline} />
-            <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4">
-              <Dna size={32} />
+  const renderSelect = () => (
+    <div className="space-y-8 animate-fade-in text-left">
+      <div className="max-w-3xl">
+        <h3 className="text-2xl font-bold text-slate-800 mb-3">Core NGS Bioinformatics Pipeline</h3>
+        <p className="text-slate-500 leading-relaxed">
+            Select the specialized analysis module for your sequencing data. Our platform integrates gold-standard bioinformatics tools (BWA, STAR, DADA2, ResFinder) to identify resistance determinants with high confidence.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {[
+          { id: 'WGS', name: 'Whole Genome (WGS)', icon: Dna, color: 'text-blue-600', bg: 'bg-blue-50', desc: 'Strain-level identification, SNP calling, and acquired AMR gene detection in pure isolates.' },
+          { id: 'RNA_SEQ', name: 'Transcriptomics (RNA-Seq)', icon: Activity, color: 'text-rose-600', bg: 'bg-rose-50', desc: 'Quantify active gene expression flux and transcriptional response to antibiotic stress (Chlorine).' },
+          { id: '16S', name: '16S rRNA Identification', icon: Network, color: 'text-indigo-600', bg: 'bg-indigo-50', desc: 'Taxonomic profiling of bacterial communities from environmental or clinical samples.' },
+          { id: 'METAGENOME', name: 'Shotgun Metagenomics', icon: Globe, color: 'text-teal-600', bg: 'bg-teal-50', desc: 'Direct analysis of community resistome, functional pathways, and MAGs from complex environments.' }
+        ].map(tool => (
+          <div key={tool.id} onClick={() => handleSelectTool(tool.id as NGSToolType)} className="group bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-400 transition-all cursor-pointer flex items-start gap-6">
+            <div className={`w-16 h-16 shrink-0 ${tool.bg} ${tool.color} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
+              <tool.icon size={32} />
             </div>
-            <h3 className="font-semibold text-slate-800 text-lg">Upload Genomic Data</h3>
-            <p className="text-sm text-slate-500 mt-2 mb-4">Raw FASTQ, FASTA, or BAM files</p>
-            <span className="px-4 py-2 bg-white border border-indigo-200 text-indigo-700 rounded-lg text-sm font-medium shadow-sm">
-              Select NGS Files
-            </span>
-          </div>
-
-          {/* Phenotypic Data Upload */}
-          <div 
-            className="border-2 border-dashed border-teal-200 bg-teal-50/50 rounded-xl p-8 flex flex-col items-center text-center cursor-pointer hover:bg-teal-50 transition-colors relative"
-          >
-            {/* Real CSV Input */}
-            <input type="file" accept=".csv" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleAstUpload} />
-            
-            <div className="w-16 h-16 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mb-4">
-              <Activity size={32} />
-            </div>
-            <h3 className="font-semibold text-slate-800 text-lg">Upload Phenotypic Data</h3>
-            <p className="text-sm text-slate-500 mt-2 mb-4">Zone of Inhibition CSV (Antibiotic,Control,Treated,Breakpoint)</p>
-            <span className="px-4 py-2 bg-white border border-teal-200 text-teal-700 rounded-lg text-sm font-medium shadow-sm">
-              Select AST Data
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="w-full max-w-xl text-center">
-          <Cpu className="mx-auto text-blue-600 animate-pulse mb-6" size={48} />
-          <h3 className="text-xl font-bold text-slate-800 mb-2">Running Bio-informatics Pipeline</h3>
-          <p className="text-slate-500 mb-8 font-mono text-sm">{processingStep}</p>
-          <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner">
-            <div 
-              className="bg-blue-600 h-full rounded-full transition-all duration-700 ease-out relative"
-              style={{ width: `${uploadProgress}%` }}
-            >
-              <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
+            <div>
+              <h4 className="font-bold text-slate-800 text-lg mb-1">{tool.name}</h4>
+              <p className="text-sm text-slate-500 mb-4">{tool.desc}</p>
+              <div className="flex items-center text-blue-600 text-sm font-bold">Configure Analysis <ChevronRight size={16} /></div>
             </div>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 
-  const renderAntibiogram = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-      <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-slate-800 flex items-center">
-            <Microscope className="mr-2 text-teal-600" size={20}/>
-            Comparative Antibiogram (In-silico & In-vitro)
-            </h3>
-            {isCustomAst && (
-                <span className="text-xs bg-teal-50 text-teal-600 px-2 py-1 rounded-full border border-teal-100 font-bold">
-                    User Data Loaded
-                </span>
+  const renderConfig = () => (
+    <div className="max-w-4xl animate-fade-in">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-100">
+                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center"><Settings size={24}/></div>
+                <div>
+                    <h3 className="text-xl font-bold text-slate-800">Pipeline Configuration: {toolType?.replace('_', '-')}</h3>
+                    <p className="text-sm text-slate-500">Provide sequencing metadata to initialize the analysis container.</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                <div className="space-y-6">
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-widest">Sample Identifier</label>
+                        <input 
+                            type="text" 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                            placeholder="e.g. VAD-WWTP-P01"
+                            value={metadata.sampleName}
+                            onChange={e => setMetadata({...metadata, sampleName: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-widest">Sequencing Instrument</label>
+                        <select 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={metadata.instrument}
+                            onChange={e => setMetadata({...metadata, instrument: e.target.value})}
+                        >
+                            {INSTRUMENTS.map(i => <option key={i} value={i}>{i}</option>)}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-widest">Sequencing Throughput</label>
+                        <div className="relative">
+                            <input 
+                                type="number" 
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                                placeholder="Million Reads"
+                                value={metadata.millionReads}
+                                onChange={e => setMetadata({...metadata, millionReads: e.target.value})}
+                            />
+                            <span className="absolute right-4 top-3 text-[10px] font-bold text-slate-400 pt-0.5">MILLION READS</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-widest">File Format</label>
+                        <div className="flex gap-2">
+                            {['FASTQ', 'FASTA', 'BAM', 'SAM'].map(fmt => (
+                                <button 
+                                    key={fmt}
+                                    onClick={() => setMetadata({...metadata, fileFormat: fmt})}
+                                    className={`flex-1 py-3 rounded-xl border text-[10px] font-bold transition-all ${metadata.fileFormat === fmt ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200'}`}
+                                >
+                                    {fmt}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center hover:border-blue-300 hover:bg-blue-50/30 transition-all cursor-pointer group mb-8">
+                <UploadCloud size={48} className="mx-auto text-slate-300 group-hover:text-blue-500 transition-colors mb-4" />
+                <h4 className="font-bold text-slate-700 text-lg">Upload Sequencing File</h4>
+                <p className="text-slate-400 text-sm mt-1">Supports compressed .gz or .zip archives (Max 2GB per upload)</p>
+                <div className="mt-6 flex justify-center gap-4">
+                    <button onClick={startAnalysis} className="bg-slate-800 text-white px-8 py-3 rounded-full font-bold text-sm hover:bg-slate-900 shadow-lg">Upload & Execute Pipeline</button>
+                    <button onClick={startAnalysis} className="bg-blue-50 text-blue-600 border border-blue-200 px-8 py-3 rounded-full font-bold text-sm hover:bg-blue-100">Load Lab Sample Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+  );
+
+  const renderProcessing = () => (
+    <div className="max-w-2xl animate-fade-in">
+        <div className="bg-slate-900 rounded-3xl p-10 shadow-2xl overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-8 opacity-10"><Cpu size={120} className="text-blue-500 animate-pulse"/></div>
+            
+            <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="w-10 h-10 bg-blue-500 text-white rounded-lg flex items-center justify-center animate-spin"><RefreshCw size={20}/></div>
+                    <div>
+                        <h3 className="text-xl font-bold text-white">Pipeline Execution</h3>
+                        <p className="text-blue-400 text-sm font-mono">Job ID: IRIS-NGS-{Math.floor(Math.random()*10000)}</p>
+                    </div>
+                </div>
+
+                <div className="mb-8">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-bold text-blue-300 uppercase tracking-widest">Total Progress</span>
+                        <span className="text-sm font-bold text-white">{Math.round(progress)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+                    </div>
+                </div>
+
+                <div className="bg-black/50 rounded-2xl p-6 font-mono text-[11px] text-emerald-400 space-y-2 h-64 overflow-y-auto scrollbar-hide">
+                    {processingLog.map((log, i) => (
+                        <div key={i} className="flex gap-2">
+                            <span className="text-emerald-800 shrink-0">#</span>
+                            <span>{log}</span>
+                        </div>
+                    ))}
+                    <div className="animate-pulse text-white">_</div>
+                </div>
+            </div>
+        </div>
+    </div>
+  );
+
+  const renderResults = () => {
+    return (
+        <div className="space-y-8 animate-fade-in max-w-6xl">
+            {/* RESULTS HEADER */}
+            <div className="flex justify-between items-center bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center shadow-inner">
+                        <CheckCircle size={32} />
+                    </div>
+                    <div>
+                        <h3 className="text-2xl font-bold text-slate-800">Final Analysis Report</h3>
+                        <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
+                            <span className="font-bold text-slate-700">{metadata.sampleName || 'Laboratory_Isolate_01'}</span>
+                            <span>•</span>
+                            <span className="italic">{metadata.instrument}</span>
+                            <span>•</span>
+                            <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{toolType?.replace('_',' ')}</span>
+                        </div>
+                    </div>
+                </div>
+                <div className="text-right flex items-center gap-6">
+                    <div className="px-6 border-r border-slate-100">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Confidence</div>
+                        <div className="text-2xl font-black text-blue-600">{pipelineConfidence}%</div>
+                    </div>
+                    <button className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-900 flex items-center gap-2 shadow-lg">
+                        <Download size={18}/> Export Dataset
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* 1. QUALITY CONTROL PANEL */}
+                <div className="lg:col-span-2 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                    <h4 className="font-bold text-slate-800 mb-8 flex items-center gap-2 uppercase tracking-wider text-sm">
+                        <LineChartIcon className="text-blue-600" size={18}/> Read Quality Assessment (FastQC)
+                    </h4>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={Array.from({ length: 150 }, (_, i) => ({ pos: i+1, q: 34 + Math.random() * 4 - (i > 120 ? (i-120)*0.5 : 0) }))}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="pos" hide />
+                                <YAxis domain={[0, 40]} label={{ value: 'Phred (Q)', angle: -90, position: 'insideLeft', fontSize: 10 }} />
+                                <Tooltip />
+                                <ReferenceLine y={30} stroke="#10b981" strokeDasharray="3 3" />
+                                <Area type="monotone" dataKey="q" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="mt-6 p-4 bg-slate-50 rounded-2xl flex items-center gap-4 text-xs">
+                        <div className="flex-1">
+                            <span className="text-slate-500">Median Quality Score:</span>
+                            <span className="font-bold ml-2 text-slate-800">Q36.2</span>
+                        </div>
+                        <div className="flex-1">
+                            <span className="text-slate-500">Adapter Content:</span>
+                            <span className="font-bold ml-2 text-green-600">PASSED</span>
+                        </div>
+                        <div className="flex-1">
+                            <span className="text-slate-500">GC Content:</span>
+                            <span className="font-bold ml-2 text-slate-800">54.2%</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 2. SUMMARY STATS */}
+                <div className="bg-slate-900 rounded-3xl p-8 text-white flex flex-col justify-between">
+                    <div>
+                        <h4 className="font-bold mb-6 text-sm flex items-center gap-2 uppercase tracking-widest text-slate-400">
+                           <Zap className="text-amber-400" size={18}/> Biological Insight
+                        </h4>
+                        <p className="text-lg leading-relaxed text-slate-300">
+                            The analysis detected <strong className="text-white">high-level resistance markers</strong> indicating a stress-induced adaptive response.
+                        </p>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end border-b border-white/10 pb-2">
+                            <span className="text-xs text-slate-400">Detected Features</span>
+                            <span className="font-bold text-xl">42</span>
+                        </div>
+                        <div className="flex justify-between items-end border-b border-white/10 pb-2">
+                            <span className="text-xs text-slate-400">Identity with Ref</span>
+                            <span className="font-bold text-xl text-emerald-400">99.8%</span>
+                        </div>
+                        <div className="flex justify-between items-end">
+                            <span className="text-xs text-slate-400">MLST Clade</span>
+                            <span className="font-bold text-xl">ST131</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* DYNAMIC PIPELINE SPECIFIC VIEWS */}
+            {toolType === 'RNA_SEQ' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div className="lg:col-span-3 bg-white p-10 rounded-3xl border border-slate-200">
+                        <div className="flex justify-between items-center mb-10">
+                            <h4 className="font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
+                                <Activity className="text-rose-600"/> Volcano Plot: Differentially Expressed Genes
+                            </h4>
+                            <div className="flex gap-4 text-[10px] font-bold">
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-red-500"></div> Up (log2FC &gt; 1.5)</span>
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-blue-500"></div> Down (log2FC &lt; -1.5)</span>
+                            </div>
+                        </div>
+                        <div className="h-96">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis type="number" dataKey="log2FoldChange" name="Log2FC" label={{ value: 'log2(Fold Change)', position: 'insideBottom', offset: -10 }} />
+                                    <YAxis type="number" dataKey="pvalue" name="P-Value" tickFormatter={() => ''} label={{ value: '-log10(P)', angle: -90, position: 'insideLeft' }} />
+                                    <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                                    <ReferenceLine x={1.5} stroke="#ef4444" strokeDasharray="3 3" />
+                                    <ReferenceLine x={-1.5} stroke="#3b82f6" strokeDasharray="3 3" />
+                                    <Scatter data={Array.from({ length: 100 }, (_, i) => ({ 
+                                        gene: `g${i}`, 
+                                        log2FoldChange: i < 15 ? 2 + Math.random() * 3 : i < 25 ? -2 - Math.random() * 2 : (Math.random() * 2) - 1, 
+                                        pvalue: Math.random() * 0.1 
+                                    }))}>
+                                        {Array.from({ length: 100 }, (_, i) => i).map((i) => (
+                                            <Cell key={i} fill={i < 15 ? '#ef4444' : i < 25 ? '#3b82f6' : '#cbd5e1'} />
+                                        ))}
+                                    </Scatter>
+                                </ScatterChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                    <div className="bg-white p-8 rounded-3xl border border-slate-200">
+                        <h4 className="font-bold text-slate-800 text-xs uppercase mb-6 tracking-widest">Enriched Pathways</h4>
+                        <div className="space-y-6">
+                            {[
+                                { name: 'Efflux Complex', val: 92, color: 'bg-rose-500' },
+                                { name: 'Biofilm Matrix', val: 78, color: 'bg-amber-500' },
+                                { name: 'Quorum Sensing', val: 45, color: 'bg-blue-500' },
+                                { name: 'Metabolism', val: 22, color: 'bg-slate-300' }
+                            ].map(p => (
+                                <div key={p.name}>
+                                    <div className="flex justify-between text-[10px] font-bold mb-2">
+                                        <span className="text-slate-500 uppercase">{p.name}</span>
+                                        <span className="text-slate-800">{p.val}%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                        <div className={`${p.color} h-full`} style={{ width: `${p.val}%` }}></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-8 italic leading-relaxed text-center">
+                            Significant upregulation of MexAB-OprM efflux system observed post-chlorine exposure.
+                        </p>
+                    </div>
+                </div>
+            ) : toolType === '16S' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                     <div className="bg-white p-10 rounded-3xl border border-slate-200">
+                        <h4 className="font-bold text-slate-800 uppercase tracking-widest text-sm mb-10 flex items-center gap-2">
+                            <Network className="text-indigo-600"/> Taxonomic Composition (Phylum Level)
+                        </h4>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={TAXONOMY_DATA} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <XAxis type="number" hide />
+                                    <YAxis dataKey="name" type="category" width={120} tick={{fontSize: 12, fontWeight: 'bold'}} />
+                                    <Tooltip />
+                                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
+                                        {TAXONOMY_DATA.map((entry, index) => (
+                                            <Cell key={index} fill={entry.color} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                    <div className="bg-white p-10 rounded-3xl border border-slate-200">
+                        <h4 className="font-bold text-slate-800 uppercase tracking-widest text-sm mb-10 flex items-center gap-2">
+                            <PieChart className="text-teal-600"/> Community Diversity Metrics
+                        </h4>
+                        <div className="grid grid-cols-2 gap-8">
+                             <div className="text-center p-6 bg-slate-50 rounded-3xl">
+                                <div className="text-xs font-bold text-slate-400 mb-2 uppercase">Shannon Index (H')</div>
+                                <div className="text-3xl font-black text-slate-800">4.12</div>
+                                <p className="text-[10px] text-slate-400 mt-2">High diversity community</p>
+                             </div>
+                             <div className="text-center p-6 bg-slate-50 rounded-3xl">
+                                <div className="text-xs font-bold text-slate-400 mb-2 uppercase">Simpson's (D)</div>
+                                <div className="text-3xl font-black text-slate-800">0.94</div>
+                                <p className="text-[10px] text-slate-400 mt-2">Dominant species identified</p>
+                             </div>
+                             <div className="col-span-2 text-center p-6 border border-slate-100 rounded-3xl">
+                                <div className="text-[10px] font-bold text-slate-400 mb-2 uppercase">Identified ASVs</div>
+                                <div className="text-4xl font-black text-indigo-600">842</div>
+                                <p className="text-[10px] text-slate-400 mt-2">Post-Denoising via DADA2 Pipeline</p>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            ) : toolType === 'WGS' ? (
+                <div className="bg-white p-10 rounded-3xl border border-slate-200">
+                    <h4 className="font-bold text-slate-800 uppercase tracking-widest text-sm mb-10 flex items-center gap-2">
+                        <Info className="text-blue-600"/> Genomic Variant & MLST Profiling
+                    </h4>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                                <tr>
+                                    <th className="p-4">Gene / Locus</th>
+                                    <th className="p-4">Variant Type</th>
+                                    <th className="p-4">Impact</th>
+                                    <th className="p-4">Clin. Interpretation</th>
+                                    <th className="p-4">Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {[
+                                    { gene: 'gyrA (D87N)', type: 'Missense SNP', impact: 'HIGH', int: 'Ciprofloxacin Resistance', conf: '100%' },
+                                    { gene: 'blaNDM-1', type: 'Acquired ARG', impact: 'CRITICAL', int: 'Carbapenem Hydrolysis', conf: '99.9%' },
+                                    { gene: 'parC (S80I)', type: 'Missense SNP', impact: 'MEDIUM', int: 'Fluoroquinolone Resistance', conf: '100%' },
+                                    { gene: 'mcr-1', type: 'Acquired ARG', impact: 'CRITICAL', int: 'Colistin Resistance (MCR)', conf: '98.5%' }
+                                ].map((row, i) => (
+                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                        <td className="p-4 font-mono font-bold text-slate-700">{row.gene}</td>
+                                        <td className="p-4 text-slate-600">{row.type}</td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${row.impact === 'CRITICAL' || row.impact === 'HIGH' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                {row.impact}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 font-medium text-slate-800">{row.int}</td>
+                                        <td className="p-4 text-emerald-600 font-bold">{row.conf}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                     <div className="bg-white p-10 rounded-3xl border border-slate-200">
+                        <h4 className="font-bold text-slate-800 uppercase tracking-widest text-sm mb-10 flex items-center gap-2">
+                            <Layers className="text-teal-600"/> Resistome Abundance Matrix
+                        </h4>
+                        <div className="space-y-6">
+                            {METAGENOME_RESISTOME.map(r => (
+                                <div key={r.class} className="flex items-center gap-6">
+                                    <div className="w-32 font-bold text-slate-600 text-xs uppercase">{r.class}</div>
+                                    <div className="flex-1 bg-slate-100 h-8 rounded-lg overflow-hidden relative border border-slate-200 shadow-inner">
+                                        <div className="bg-teal-500 h-full transition-all" style={{ width: `${r.abundance * 4}%` }}></div>
+                                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-800">{r.abundance} RPKM</span>
+                                    </div>
+                                    <div className={`w-20 text-[10px] font-bold text-center py-1 rounded-full ${r.risk === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : r.risk === 'HIGH' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                        {r.risk}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="bg-slate-900 text-white p-10 rounded-3xl flex flex-col justify-center">
+                        <div className="text-center mb-8">
+                            <div className="text-sm font-bold text-teal-400 uppercase tracking-widest mb-2">Overall Community Risk</div>
+                            <div className="text-6xl font-black">CRITICAL</div>
+                        </div>
+                        <div className="p-6 bg-white/5 rounded-2xl border border-white/10 text-sm italic leading-relaxed text-slate-400">
+                            "The sample exhibits a multi-drug resistant population structure with a significant proportion of carbapenemase genes (blaKPC, blaNDM) linked to mobile genetic elements."
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
-        
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={antibiogramData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="antibiotic" tick={{fontSize: 12}} />
-              <YAxis label={{ value: 'Zone of Inhibition (mm)', angle: -90, position: 'insideLeft' }} />
-              <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px'}} />
-              <Legend />
-              <ReferenceLine y={18} label="Resistant Breakpoint" stroke="red" strokeDasharray="3 3" />
-              <Bar dataKey="Control" fill="#10b981" name="Pre-Chlorination" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Treated" fill="#f43f5e" name="Post-Chlorination" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <p className="mt-4 text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
-          <strong>Observation:</strong> {isCustomAst 
-            ? "Based on your uploaded data, several antibiotics show reduced zone sizes in the Treated group compared to Control, suggesting acquired tolerance."
-            : "Significant reduction in zone size for Ciprofloxacin and Ceftazidime post-treatment, indicating acquired resistance or phenotypic adaptation."}
-        </p>
-      </div>
-
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center">
-        <h3 className="text-lg font-bold text-slate-800 mb-4 w-full text-left">Resistance Radar</h3>
-        <div className="h-64 w-full">
-           <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={antibiogramData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="antibiotic" tick={{fontSize: 10}} />
-                <PolarRadiusAxis angle={30} domain={[0, 35]} />
-                <Radar name="Control" dataKey="Control" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
-                <Radar name="Treated" dataKey="Treated" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.3} />
-                <Legend />
-              </RadarChart>
-           </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderPhylogeny = () => (
-    <div className="space-y-6 animate-fade-in">
-      {/* Alignment Results */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-slate-800 flex items-center">
-            <Search className="mr-2 text-indigo-600" size={20}/>
-            BLASTN Identification Results
-          </h3>
-          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">Query Coverage: 99.9%</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-slate-500 font-medium border-b border-slate-100 bg-slate-50">
-              <tr>
-                <th className="p-3">Accession</th>
-                <th className="p-3">Organism Description</th>
-                <th className="p-3">Max Score</th>
-                <th className="p-3">E-Value</th>
-                <th className="p-3">Identity (%)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MOCK_BLAST_HITS.map((hit, i) => (
-                <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                  <td className="p-3 font-mono text-blue-600 hover:underline cursor-pointer">{hit.accession}</td>
-                  <td className="p-3 font-medium text-slate-800">{hit.organism}</td>
-                  <td className="p-3 text-slate-600">{hit.score}</td>
-                  <td className="p-3 text-slate-600">{hit.eValue}</td>
-                  <td className="p-3">
-                    <div className="flex items-center space-x-2">
-                      <span className={`font-bold ${hit.identity > 99 ? 'text-green-600' : 'text-amber-600'}`}>{hit.identity}%</span>
-                      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-green-500" style={{width: `${hit.identity}%`}}></div>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Phylogenetic Tree Simulation */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center">
-          <Network className="mr-2 text-indigo-600" size={20}/>
-          Phylogenetic Tree (Neighbor-Joining)
-        </h3>
-        <div className="flex justify-center py-4">
-          {/* Simple SVG Tree */}
-          <svg width="600" height="300" className="border border-slate-100 bg-slate-50 rounded-lg p-4">
-            <style>{`.tree-text { font-size: 12px; font-family: monospace; fill: #475569; } .tree-line { stroke: #94a3b8; stroke-width: 2; fill: none; }`}</style>
-            
-            {/* Root */}
-            <path d="M50 150 L100 150" className="tree-line" />
-            
-            {/* Branch 1 (Outgroup) */}
-            <path d="M100 150 L100 250 L150 250" className="tree-line" />
-            <text x="160" y="254" className="tree-text">Escherichia coli K-12</text>
-
-            {/* Branch 2 (Pseudomonas Clade) */}
-            <path d="M100 150 L100 50 L150 50" className="tree-line" />
-            
-            {/* Sub-branch 2a */}
-            <path d="M150 50 L150 20 L200 20" className="tree-line" />
-            <text x="210" y="24" className="tree-text">P. putida KT2440</text>
-
-            {/* Sub-branch 2b */}
-            <path d="M150 50 L150 100 L200 100" className="tree-line" />
-            
-            {/* Target Clade */}
-            <path d="M200 100 L200 80 L250 80" className="tree-line" />
-            <text x="260" y="84" className="tree-text text-blue-600 font-bold" fill="#2563eb !important">Your Isolate (Sample_001)</text>
-            <circle cx="250" cy="80" r="4" fill="#2563eb" />
-
-            <path d="M200 100 L200 120 L250 120" className="tree-line" />
-            <text x="260" y="124" className="tree-text">P. aeruginosa PAO1</text>
-          </svg>
-        </div>
-        <p className="text-center text-sm text-slate-500 mt-2">
-          Bootstrapping (1000 replicates). Your isolate clusters closely with <em>P. aeruginosa</em> PAO1.
-        </p>
-      </div>
-    </div>
-  );
-
-  const renderRNASeq = () => (
-    <div className="space-y-6 animate-fade-in">
-       {/* Volcano Plot - Keeping as primary overview */}
-       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h3 className="text-lg font-bold text-slate-800 mb-2">Differential Expression (Volcano Plot)</h3>
-           <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" dataKey="log2FoldChange" name="Log2FC" />
-                  <YAxis type="number" dataKey="pvalue" name="p-value" tickFormatter={() => ""} label={{value: '-Log10(P)', angle: -90, position: 'insideLeft'}} />
-                  <Tooltip content={() => null} />
-                  <Scatter data={MOCK_GENE_DATA} fill="#8884d8">
-                    {MOCK_GENE_DATA.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.significance === 'UP' ? '#ef4444' : entry.significance === 'DOWN' ? '#3b82f6' : '#cbd5e1'} />
-                    ))}
-                  </Scatter>
-                  <ReferenceLine x={0} stroke="#666" strokeDasharray="3 3"/>
-                </ScatterChart>
-              </ResponsiveContainer>
-           </div>
-           <div className="flex justify-center space-x-6 text-sm mt-2">
-              <div className="flex items-center"><div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div> Upregulated (Stress)</div>
-              <div className="flex items-center"><div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div> Downregulated</div>
-           </div>
-        </div>
-
-       {/* Integrated Advanced Analytics (Heatmap, Pathway, SNP) */}
-       <AdvancedNGSAnalytics dataType="RNA_SEQ" />
-
-       {/* Gene Mechanism Table */}
-       <GeneMechanismTable data={MOCK_GENE_DATA} />
-    </div>
-  );
-
-  const renderReport = () => (
-    <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm animate-fade-in max-w-4xl mx-auto">
-       <div className="flex items-center space-x-3 mb-6 border-b border-slate-100 pb-6">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-3 rounded-xl text-white">
-             <FileText size={32} />
-          </div>
-          <div>
-             <h2 className="text-2xl font-bold text-slate-800">Integrated Research Report</h2>
-             <p className="text-slate-500">Auto-generated by ChlorineResist Analysis Pipeline</p>
-          </div>
-       </div>
-
-       <div className="space-y-6">
-          <section>
-             <h3 className="text-lg font-bold text-indigo-900 mb-2">1. Genomic Identification</h3>
-             <p className="text-slate-700 leading-relaxed">
-                The isolated strain (Sample_001) shows <strong>99.8% identity to <em>Pseudomonas aeruginosa</em> PAO1</strong> based on local alignment of the 16S rRNA region extracted from RNA-seq data. Phylogenetic analysis places it firmly within the <em>Pseudomonas</em> clade, distinct from enteric pathogens like <em>E. coli</em>.
-             </p>
-          </section>
-
-          <section>
-             <h3 className="text-lg font-bold text-indigo-900 mb-2">2. Phenotypic Resistance (Antibiogram)</h3>
-             <p className="text-slate-700 leading-relaxed">
-                Post-chlorination survivors exhibited a marked decrease in susceptibility to <strong>Ciprofloxacin</strong> and <strong>Ceftazidime</strong>. This shift crosses the CLSI breakpoint, classifying the survivors as resistant, whereas the pre-chlorination population was sensitive.
-             </p>
-          </section>
-
-          <section>
-             <h3 className="text-lg font-bold text-indigo-900 mb-2">3. Transcriptomic Mechanism (RNA-seq)</h3>
-             <p className="text-slate-700 leading-relaxed">
-                Differential expression analysis reveals the mechanism of this acquired resistance. We observe:
-             </p>
-             <ul className="list-disc pl-5 mt-2 space-y-1 text-slate-700">
-                <li><strong>Upregulation of Efflux Pumps:</strong> <em>mexA</em> (2.5-fold) and <em>mexB</em> (2.8-fold) are significantly overexpressed, likely pumping out antibiotics.</li>
-                <li><strong>SOS Response Activation:</strong> <em>recA</em> (3.2-fold) and <em>lexA</em> upregulation confirms DNA damage stress from chlorine.</li>
-                <li><strong>Porin Downregulation:</strong> <em>ompF</em> is downregulated, reducing membrane permeability to toxic agents.</li>
-             </ul>
-          </section>
-
-          <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mt-8">
-             <h4 className="font-bold text-yellow-800 mb-1">Conclusion</h4>
-             <p className="text-yellow-800 text-sm">
-                The data strongly supports the hypothesis that sub-lethal chlorine stress induces multidrug resistance via the activation of the MexAB-OprM efflux system and the SOS response network in <em>P. aeruginosa</em>.
-             </p>
-          </div>
-       </div>
-    </div>
-  );
+    );
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white border-b border-slate-200 px-6 pt-4 sticky top-0 z-10 shadow-sm rounded-t-xl overflow-x-auto">
-        <div className="flex space-x-6 min-w-max">
-           <TabButton id="upload" label="Data Upload" icon={UploadCloud} />
-           <TabButton id="antibiogram" label="Antibiogram Analysis" icon={Activity} />
-           <TabButton id="phylogeny" label="ID & Phylogeny" icon={Network} />
-           <TabButton id="rnaseq" label="Transcriptomics" icon={Dna} />
-           <TabButton id="report" label="Final Report" icon={FileText} />
+    <div className="space-y-8">
+      <div className="flex items-center gap-4 text-left">
+        <button onClick={goBack} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600">
+          <ArrowLeft size={20} />
+        </button>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">NGS Pipeline Analysis</h2>
+          <p className="text-sm text-slate-500 italic">Advanced High-Throughput Sequencing & Bioinformatics Workbench</p>
         </div>
       </div>
 
-      <div className="min-h-[500px]">
-         {activeTab === 'upload' && renderUpload()}
-         {activeTab === 'antibiogram' && renderAntibiogram()}
-         {activeTab === 'phylogeny' && renderPhylogeny()}
-         {activeTab === 'rnaseq' && renderRNASeq()}
-         {activeTab === 'report' && renderReport()}
-      </div>
+      {workflow === 'SELECT' && renderSelect()}
+      {workflow === 'CONFIG' && renderConfig()}
+      {workflow === 'PROCESSING' && renderProcessing()}
+      {workflow === 'RESULTS' && renderResults()}
     </div>
   );
 };
