@@ -8,7 +8,7 @@ const AIConsultant: React.FC = () => {
     {
       id: 'welcome',
       role: 'model',
-      text: "Hello! I am your AI Research Mentor. I've analyzed your summary regarding chlorine-induced antibiotic resistance in Gujarat WWTPs. Your hypothesis about stress-induced horizontal gene transfer and transcriptional changes is fascinating. How can I assist you with your NGS planning or data interpretation today?",
+      text: "Hello! I am the IRIS AI Research & Policy Advisor. Share your isolate metadata, antibiogram breakpoints, PCR markers, or One Health surveillance questions and I will help you interpret findings and plan follow-up validation.",
       timestamp: new Date()
     }
   ]);
@@ -25,21 +25,23 @@ const AIConsultant: React.FC = () => {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    const trimmed = input.trim();
+    if (!trimmed || isLoading) return;
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      text: input,
+      text: trimmed,
       timestamp: new Date()
     };
 
+    const currentHistory = [...messages];
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
 
     try {
-      const responseText = await sendMessageToGemini(input);
+      const responseText = await sendMessageToGemini(trimmed, currentHistory);
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'model',
@@ -48,7 +50,16 @@ const AIConsultant: React.FC = () => {
       };
       setMessages(prev => [...prev, botMsg]);
     } catch (error) {
-      console.error(error);
+      const errMsg = error instanceof Error ? error.message : 'Unable to reach AI advisor.';
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: 'model',
+          text: `System Alert: ${errMsg}`,
+          timestamp: new Date()
+        }
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +72,7 @@ const AIConsultant: React.FC = () => {
           <Sparkles size={20} />
           <h2 className="font-semibold">AI Research Consultant (Gemini Powered)</h2>
         </div>
-        <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full">gemini-3-flash</span>
+        <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full">gemini-4-hydrogen</span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
@@ -79,7 +90,7 @@ const AIConsultant: React.FC = () => {
             >
               <div className="flex items-center space-x-2 mb-1 opacity-70 text-xs">
                 {msg.role === 'user' ? <User size={12} /> : <Bot size={12} />}
-                <span>{msg.role === 'user' ? 'PhD Researcher' : 'AI Mentor'}</span>
+                <span>{msg.role === 'user' ? 'Researcher' : 'AI Mentor'}</span>
               </div>
               <div className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</div>
             </div>

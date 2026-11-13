@@ -1,0 +1,256 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --iris-bg: #f8fafc;
+  --iris-surface: #ffffff;
+  --iris-surface-elevated: #ffffff;
+  --iris-surface-muted: #f1f5f9;
+  --iris-surface-subtle: #f8fafc;
+  --iris-border: #e2e8f0;
+  --iris-border-subtle: #f1f5f9;
+  --iris-border-strong: #cbd5e1;
+  --iris-text-primary: #0f172a;
+  --iris-text-secondary: #334155;
+  --iris-text-muted: #64748b;
+  --iris-text-faint: #94a3b8;
+  --iris-hover: #f1f5f9;
+  --iris-input-bg: #ffffff;
+  --iris-accent: #2563eb;
+  --iris-accent-soft: #eff6ff;
+  --iris-shadow-color: rgba(15, 23, 42, 0.08);
+}
+
+:root.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --iris-bg: #0b1120;
+  --iris-surface: #111827;
+  --iris-surface-elevated: #162033;
+  --iris-surface-muted: #1e293b;
+  --iris-surface-subtle: #0f172a;
+  --iris-border: #1f2937;
+  --iris-border-subtle: #1e293b;
+  --iris-border-strong: #334155;
+  --iris-text-primary: #f1f5f9;
+  --iris-text-secondary: #cbd5e1;
+  --iris-text-muted: #94a3b8;
+  --iris-text-faint: #64748b;
+  --iris-hover: #1e293b;
+  --iris-input-bg: #0f172a;
+  --iris-accent: #3b82f6;
+  --iris-accent-soft: rgba(59, 130, 246, 0.16);
+  --iris-shadow-color: rgba(0, 0, 0, 0.45);
+}
+
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--iris-bg);
+    color: var(--iris-text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
+
+/* Global CSS-variable-driven dark theme mappings across components */
+:root.dark .bg-white {
+  background-color: var(--iris-surface);
+}
+
+:root.dark .bg-slate-50 {
+  background-color: var(--iris-surface-subtle);
+}
+
+:root.dark .bg-slate-100 {
+  background-color: var(--iris-surface-muted);
+}
+
+:root.dark .bg-slate-200 {
+  background-color: var(--iris-border-strong);
+}
+
+:root.dark .text-slate-900,
+:root.dark .text-slate-800 {
+  color: var(--iris-text-primary);
+}
+
+:root.dark .text-slate-700,
+:root.dark .text-slate-600 {
+  color: var(--iris-text-secondary);
+}
+
+:root.dark .text-slate-500 {
+  color: var(--iris-text-muted);
+}
+
+:root.dark .text-slate-400 {
+  color: var(--iris-text-faint);
+}
+
+:root.dark .border-slate-100 {
+  border-color: var(--iris-border-subtle);
+}
+
+:root.dark .border-slate-200 {
+  border-color: var(--iris-border);
+}
+
+:root.dark .border-slate-300 {
+  border-color: var(--iris-border-strong);
+}
+
+:root.dark .divide-slate-100 > :not(:last-child),
+:root.dark .divide-slate-50 > :not(:last-child) {
+  border-color: var(--iris-border-subtle);
+}
+
+:root.dark .hover\:bg-slate-50:hover,
+:root.dark .hover\:bg-slate-100:hover,
+:root.dark .hover\:bg-slate-200:hover {
+  background-color: var(--iris-hover);
+}
+
+:root.dark input:not([type="checkbox"]):not([type="radio"]),
+:root.dark select,
+:root.dark textarea {
+  background-color: var(--iris-input-bg);
+  color: var(--iris-text-primary);
+  border-color: var(--iris-border-strong);
+}
+
+:root.dark input::placeholder,
+:root.dark textarea::placeholder {
+  color: var(--iris-text-faint);
+}
+
+/* Soft tinted alert/card surfaces in dark mode */
+:root.dark .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.14);
+}
+:root.dark .border-amber-200,
+:root.dark .border-amber-300 {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+:root.dark .text-amber-900,
+:root.dark .text-amber-800,
+:root.dark .text-amber-700 {
+  color: #fcd34d;
+}
+
+:root.dark .bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.14);
+}
+:root.dark .border-blue-100,
+:root.dark .border-blue-200 {
+  border-color: rgba(59, 130, 246, 0.32);
+}
+:root.dark .text-blue-900,
+:root.dark .text-blue-800,
+:root.dark .text-blue-700 {
+  color: #93c5fd;
+}
+
+:root.dark .bg-indigo-50 {
+  background-color: rgba(99, 102, 241, 0.15);
+}
+:root.dark .border-indigo-100,
+:root.dark .border-indigo-200 {
+  border-color: rgba(99, 102, 241, 0.35);
+}
+:root.dark .text-indigo-900,
+:root.dark .text-indigo-800,
+:root.dark .text-indigo-700 {
+  color: #a5b4fc;
+}
+
+:root.dark .bg-rose-50,
+:root.dark .bg-red-50 {
+  background-color: rgba(244, 63, 94, 0.14);
+}
+:root.dark .border-rose-100,
+:root.dark .border-rose-200,
+:root.dark .border-red-100,
+:root.dark .border-red-200 {
+  border-color: rgba(244, 63, 94, 0.35);
+}
+:root.dark .text-rose-800,
+:root.dark .text-rose-700,
+:root.dark .text-red-800,
+:root.dark .text-red-700 {
+  color: #fda4af;
+}
+
+:root.dark .bg-green-50,
+:root.dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.14);
+}
+:root.dark .border-green-100,
+:root.dark .border-green-200,
+:root.dark .border-emerald-200 {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+:root.dark .text-green-800,
+:root.dark .text-green-700,
+:root.dark .text-emerald-700 {
+  color: #6ee7b7;
+}
+
+:root.dark .bg-teal-50 {
+  background-color: rgba(20, 184, 166, 0.14);
+}
+:root.dark .border-teal-200 {
+  border-color: rgba(20, 184, 166, 0.35);
+}
+:root.dark .text-teal-700 {
+  color: #5eead4;
+}
+
+:root.dark .bg-purple-50 {
+  background-color: rgba(168, 85, 247, 0.14);
+}
+:root.dark .border-purple-100 {
+  border-color: rgba(168, 85, 247, 0.32);
+}
+:root.dark .text-purple-900,
+:root.dark .text-purple-700 {
+  color: #d8b4fe;
+}
+
+/* Recharts axes and tooltip legibility in dark mode */
+:root.dark .recharts-cartesian-axis-tick-value {
+  fill: var(--iris-text-muted);
+}
+:root.dark .recharts-default-tooltip {
+  background-color: var(--iris-surface-elevated) !important;
+  border-color: var(--iris-border-strong) !important;
+  color: var(--iris-text-primary) !important;
+}
+
+/* Preserve light diagram contrast inside MetabolicPathwayMapper SVG */
+:root.dark .kegg-diagram-surface {
+  background-color: #f8fafc;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out;
+}

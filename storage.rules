@@ -1,0 +1,51 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function getReportData(reportId) {
+      return firestore.get(/databases/ai-studio-irisindianresist-8cf73850-0425-4205-87c4-173dcfcb3ba3/documents/reports/$(reportId)).data;
+    }
+
+    function isValidReportFile(fileName) {
+      return fileName.size() >= 1
+        && fileName.size() <= 200
+        && fileName.lower().matches('.*\\.(csv|xlsx|txt|fasta|fastq|gz|pdf)$');
+    }
+
+    match /reports/{reportId}/{fileName} {
+      // Signed-in users can read approved PUBLIC report files; PRIVATE or unapproved report files are readable only by the author (or admin)
+      allow read: if isSignedIn() && (
+        getReportData(reportId).authorId == request.auth.uid
+        || isAdmin()
+        || (getReportData(reportId).visibility == 'PUBLIC' && getReportData(reportId).status == 'APPROVED')
+      );
+
+      // Only verified users can upload/overwrite files in their own report's folder (max 25 MB, allowed formats)
+      allow create, update: if isVerifiedUser()
+        && getReportData(reportId).authorId == request.auth.uid
+        && request.resource != null
+        && request.resource.size <= 25 * 1024 * 1024
+        && isValidReportFile(fileName);
+
+      // Verified report author can delete files in their own report's folder
+      allow delete: if isVerifiedUser()
+        && getReportData(reportId).authorId == request.auth.uid;
+    }
+  }
+}

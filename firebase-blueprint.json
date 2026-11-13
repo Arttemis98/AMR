@@ -1,0 +1,288 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Researcher professional profile without sensitive contact PII.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the researcher."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Full name of the researcher."
+        },
+        "designation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Academic or clinical designation."
+        },
+        "institute": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Affiliated research institute or hospital."
+        },
+        "orcid": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Optional ORCID identifier."
+        },
+        "avatarInitials": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4,
+          "description": "Initials displayed in the user avatar."
+        },
+        "themePreference": {
+          "type": "string",
+          "enum": ["light", "dark"],
+          "description": "Preferred UI color theme."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of profile creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last profile update."
+        }
+      },
+      "required": [
+        "uid",
+        "name",
+        "designation",
+        "institute",
+        "avatarInitials",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII contact details owned by a single researcher.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID matching parent user document."
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160,
+          "description": "Researcher email address."
+        },
+        "mobile": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Researcher contact phone number."
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "City or laboratory mailing address."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update."
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AMRReport": {
+      "title": "AMRReport",
+      "description": "Antimicrobial resistance surveillance report submitted by a verified researcher.",
+      "type": "object",
+      "properties": {
+        "authorId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the submitting researcher."
+        },
+        "submittedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Display name of the submitting researcher."
+        },
+        "submittedByInstitute": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Institute of the submitting researcher."
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Indian State or Union Territory."
+        },
+        "city": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "City or district."
+        },
+        "siteName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Sampling site or hospital name."
+        },
+        "latitude": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Optional GPS latitude."
+        },
+        "longitude": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Optional GPS longitude."
+        },
+        "date": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 20,
+          "description": "Sample collection date (YYYY-MM-DD)."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["CLINICAL", "WWTP", "RIVER", "SOIL", "LIVESTOCK"],
+          "description": "Sample origin category."
+        },
+        "dataType": {
+          "type": "string",
+          "enum": ["AST_ONLY", "PCR", "WGS", "RNA_SEQ"],
+          "description": "Laboratory analysis category."
+        },
+        "standard": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Interpretive standard used (e.g., CLSI M100)."
+        },
+        "organism": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Target organism name."
+        },
+        "resistanceFlag": {
+          "type": "string",
+          "enum": ["HIGH", "MEDIUM", "LOW"],
+          "description": "Risk classification flag."
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Short summary of resistance findings."
+        },
+        "fileName": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Uploaded dataset filename."
+        },
+        "filePath": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Firebase Storage path of uploaded dataset file."
+        },
+        "clinicalSampleType": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Clinical specimen type if applicable."
+        },
+        "ph": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "Environmental sample pH if applicable."
+        },
+        "temperature": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "Environmental sample temperature if applicable."
+        },
+        "cod": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "Chemical Oxygen Demand if applicable."
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["PUBLIC", "PRIVATE"],
+          "description": "Whether the anonymized surveillance report is visible on the public dashboard."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "APPROVED", "REJECTED"],
+          "description": "Moderation review status before a public report appears on the public dashboard."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update."
+        }
+      },
+      "required": [
+        "authorId",
+        "submittedBy",
+        "state",
+        "city",
+        "siteName",
+        "date",
+        "source",
+        "dataType",
+        "standard",
+        "organism",
+        "resistanceFlag",
+        "summary",
+        "visibility",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Researcher professional profile keyed by Firebase Auth UID."
+    },
+    "/users/{userId}/private/{infoId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Isolated researcher PII contact document (email, mobile, address)."
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/AMRReport" },
+      "description": "Submitted AMR surveillance reports."
+    }
+  }
+}

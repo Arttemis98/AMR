@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, RefreshCw, Zap, Shield, Info, UploadCloud, Search, Play, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Box, RefreshCw, Zap, Shield, Info, UploadCloud, Search, Play, ArrowRight, ArrowLeft, AlertTriangle } from 'lucide-react';
 
 const ProteinDockingViewer: React.FC = () => {
   const [view, setView] = useState<'UPLOAD' | 'ANALYSIS'>('UPLOAD');
@@ -102,7 +102,14 @@ const ProteinDockingViewer: React.FC = () => {
   );
 
   const renderAnalysis = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
+      <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-900 text-xs">
+        <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+        <span>
+          <strong>Illustrative sample data:</strong> Structural docking view and D87N mutation commentary are pre-written educational visualizations, not computed from uploaded PDB/FASTA coordinates.
+        </span>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       
       {/* VISUALIZER PANEL */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center">
@@ -243,6 +250,7 @@ const ProteinDockingViewer: React.FC = () => {
          <button onClick={() => setView('UPLOAD')} className="flex items-center gap-1 text-slate-500 text-sm hover:text-slate-800 hover:underline">
             <ArrowLeft size={16}/> Upload different file
          </button>
+      </div>
       </div>
     </div>
   );

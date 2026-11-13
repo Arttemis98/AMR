@@ -1,20 +1,30 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# IRIS — Indian Resistance Interpretation Surveillance
 
-# Run and deploy your AI Studio app
+IRIS is a One Health antimicrobial resistance (AMR) surveillance web portal for submitting, moderating, and reviewing clinical and environmental AMR reports across India, with integrated bioinformatics workbenches, real NCBI BLASTN 16S/nucleotide homology lookup, and a Gemini-powered scientific advisor.
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/drive/1zOPgCZDemI1m5vxcB5U09GBfiiFSgTPs
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
+## Running Locally
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+2. Set required environment variables (in `.env.local` or shell):
+   - `GEMINI_API_KEY` — Google Gemini API key used server-side by `/api/chat`.
+   - Firebase Admin credentials for token verification:
+     - Either `GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json`, or
+     - `FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'`, or
+     - `FIREBASE_PROJECT_ID` (defaults to `projectId` in `firebase-applet-config.json` for ID token verification).
+3. Start the development server (runs on port `3000`):
+   ```bash
+   npm run dev
+   ```
+4. Build and run in production:
+   ```bash
+   npm run build
+   npm start
+   ```
+
+## Security Rules & Moderation
+
+- **Firestore (`firestore.rules`)**: Newly submitted reports are created with `status: "PENDING"`. Public dashboard queries only return reports with `visibility == "PUBLIC"` and `status == "APPROVED"`. Only users with custom Auth claim `admin == true` can change `status`.
+- **Storage (`storage.rules`)**: Uploaded report datasets are stored at `reports/{reportId}/{fileName}` (max 25 MB; `.csv`, `.xlsx`, `.txt`, `.fasta`, `.fastq`, `.gz`, `.pdf`).

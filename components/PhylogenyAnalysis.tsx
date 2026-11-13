@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Network, Search, Activity, ChevronRight, Check, ArrowLeft, UploadCloud, RefreshCw, AlertTriangle, CheckCircle, Download, Share2, Dna, Server, Globe, Cpu } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { Network, Search, Activity, ChevronRight, Check, ArrowLeft, UploadCloud, RefreshCw, AlertTriangle, CheckCircle, Download, Share2, Dna, Globe, AlertCircle } from 'lucide-react';
+import { auth } from '../services/firebase';
 
 // --- TYPES ---
 interface BlastHit {
@@ -8,8 +8,8 @@ interface BlastHit {
     description: string;
     score: number;
     evalue: string;
-    identity: number; // The crucial percent identity
-    organism: string; 
+    identity: number;
+    organism: string;
     genus: string;
     lineage: string;
 }
@@ -21,125 +21,143 @@ interface PhylogenyAnalysisProps {
 const PhylogenyAnalysis: React.FC<PhylogenyAnalysisProps> = ({ onBack }) => {
   const [step, setStep] = useState(1);
   const [sequence, setSequence] = useState('');
+  const [database, setDatabase] = useState<'16S_ribosomal_RNA' | 'nt'>('16S_ribosomal_RNA');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progressMessage, setProgressMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const reportRef = useRef<HTMLDivElement>(null);
-  
+
   // Analysis State
   const [userHeader, setUserHeader] = useState('User_Query');
   const [gcContent, setGcContent] = useState(0);
   const [seqLength, setSeqLength] = useState(0);
-  
-  // The Results from the Cloud
+
+  // Results from NCBI BLAST
   const [blastHits, setBlastHits] = useState<BlastHit[]>([]);
   const [topHit, setTopHit] = useState<BlastHit | null>(null);
-  
+
   const [treeLayout, setTreeLayout] = useState<'Rectangular' | 'Radial'>('Rectangular');
 
-  // --- CLOUD BLAST ENGINE (Gemini) ---
-  const runCloudBLAST = async (seq: string) => {
-      try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          
-          // STRICT PROMPT FOR BIOINFORMATICS ACCURACY
-          const prompt = `
-            Act as a highly accurate NCBI BLASTN (Nucleotide BLAST) server.
-            Analyze the following 16S rRNA gene sequence from a bacterial isolate.
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-            SEQUENCE:
-            ${seq.substring(0, 3000)}
-
-            INSTRUCTIONS:
-            1. Compare this sequence against the standard 16S Ribosomal RNA database (Bacteria/Archaea).
-            2. Identify the Top 5 closest matches.
-            3. CRITICAL: Do NOT simply say 100% identity unless it is the standard reference strain (e.g. E. coli K-12). 
-               If the sequence looks like a wild/environmental isolate (which it likely is), estimate a realistic identity score (e.g., 99.2%, 98.5%, 96.1%).
-            4. Calculate the GC content and Length.
-            5. Return the result as a strictly formatted JSON object.
-
-            JSON FORMAT:
-            {
-              "query_stats": {
-                 "length": number,
-                 "gc_content": number
-              },
-              "hits": [
-                {
-                  "accession": "String (e.g., NR_113647.1)",
-                  "description": "String (Full organism name)",
-                  "organism": "String (Short name)",
-                  "genus": "String",
-                  "lineage": "String (Phylum > Class > Order)",
-                  "score": number (Bit score),
-                  "evalue": "String (e.g. 0.0)",
-                  "identity": number (Percentage, e.g. 98.7)
-                }
-              ]
-            }
-          `;
-
-          const response = await ai.models.generateContent({
-              model: 'gemini-3-flash-preview', // Using Flash for speed/reasoning balance
-              contents: prompt,
-              config: {
-                  temperature: 0.1, // Low temp for factual/analytical output
-              }
-          });
-
-          const text = response.text || "{}";
-          // Sanitize json string (sometimes models wrap in markdown)
-          const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-          const result = JSON.parse(jsonStr);
-
-          return result;
-
-      } catch (error) {
-          console.error("Cloud BLAST Failed", error);
-          return null;
+  // --- REAL NCBI BLAST ENGINE VIA SERVER ---
+  const runRealBLAST = async (seq: string, selectedDb: '16S_ribosomal_RNA' | 'nt') => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+          throw new Error('Please sign in to run NCBI BLAST queries.');
       }
+      const idToken = await currentUser.getIdToken();
+
+      setProgressMessage('Submitting sequence to NCBI BLASTN...');
+      const submitRes = await fetch('/api/blast', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ sequence: seq, database: selectedDb }),
+      });
+
+      const submitData = (await submitRes.json().catch(() => ({}))) as {
+          rid?: string;
+          rtoe?: number;
+          error?: string;
+      };
+
+      if (!submitRes.ok || !submitData.rid) {
+          throw new Error(submitData.error || 'Failed to submit BLAST job.');
+      }
+
+      const rid = submitData.rid;
+      const initialWaitMs = Math.min(Math.max((submitData.rtoe || 5) * 1000, 3000), 10000);
+      setProgressMessage(`Queued at NCBI (RID: ${rid}). Waiting for alignment...`);
+      await sleep(initialWaitMs);
+
+      const maxPolls = 18;
+      for (let attempt = 1; attempt <= maxPolls; attempt++) {
+          setProgressMessage(`Polling NCBI BLAST (RID: ${rid}, check ${attempt}/${maxPolls})...`);
+          const freshToken = await currentUser.getIdToken();
+          const pollRes = await fetch(
+              `/api/blast?rid=${encodeURIComponent(rid)}&database=${encodeURIComponent(selectedDb)}`,
+              {
+                  headers: {
+                      Authorization: `Bearer ${freshToken}`,
+                  },
+              }
+          );
+
+          const pollData = (await pollRes.json().catch(() => ({}))) as {
+              status?: string;
+              hits?: BlastHit[];
+              error?: string;
+          };
+
+          if (!pollRes.ok) {
+              throw new Error(pollData.error || 'Failed while polling NCBI BLAST.');
+          }
+
+          if (pollData.status === 'READY') {
+              return pollData.hits || [];
+          }
+
+          if (pollData.status === 'FAILED') {
+              throw new Error('NCBI BLAST reported that the search failed or expired.');
+          }
+
+          await sleep(4000);
+      }
+
+      throw new Error(`NCBI BLAST job ${rid} is still running after timeout. Please try again shortly.`);
   };
 
   const handleAnalyze = async () => {
+      setErrorMessage('');
       if (!sequence.trim()) {
-          alert("Please enter a FASTA sequence.");
+          setErrorMessage("Please enter a FASTA sequence.");
           return;
       }
 
       // 1. Pre-processing
       setIsProcessing(true);
+      setProgressMessage('Validating nucleotide sequence...');
       const lines = sequence.trim().split('\n');
       let header = 'User_Input';
       let seqBody = '';
 
       if (lines[0].startsWith('>')) {
-          header = lines[0].substring(1).trim(); 
+          header = lines[0].substring(1).trim() || 'User_Input';
           seqBody = lines.slice(1).join('').toUpperCase().replace(/[^ATGC]/g, '');
       } else {
           seqBody = lines.join('').toUpperCase().replace(/[^ATGC]/g, '');
       }
 
       if (seqBody.length < 50) {
-          alert("Sequence too short for analysis. Please upload at least 50bp.");
+          setErrorMessage("Sequence too short for analysis. Please provide at least 50 nucleotides.");
           setIsProcessing(false);
+          setProgressMessage('');
           return;
       }
 
-      // 2. Call Cloud Engine
-      const cloudResult = await runCloudBLAST(seqBody);
-
-      if (cloudResult && cloudResult.hits && cloudResult.hits.length > 0) {
-          setBlastHits(cloudResult.hits);
-          setTopHit(cloudResult.hits[0]);
-          setSeqLength(seqBody.length);
-          // Calculate GC locally to be safe, or use cloud result
-          const gc = ((seqBody.match(/[GC]/g) || []).length / seqBody.length) * 100;
-          setGcContent(gc);
-          setUserHeader(header.split(' ')[0]);
-          setStep(2);
-      } else {
-          alert("Cloud analysis failed to identify the sequence. Please try again or check the sequence format.");
+      // 2. Call real NCBI BLAST via server
+      try {
+          const hits = await runRealBLAST(seqBody, database);
+          if (hits.length > 0) {
+              setBlastHits(hits);
+              setTopHit(hits[0]);
+              setSeqLength(seqBody.length);
+              const gc = ((seqBody.match(/[GC]/g) || []).length / seqBody.length) * 100;
+              setGcContent(gc);
+              setUserHeader(header.split(' ')[0]);
+              setStep(2);
+          } else {
+              setErrorMessage("NCBI BLAST completed but found no matching hits in the selected database.");
+          }
+      } catch (err) {
+          setErrorMessage(err instanceof Error ? err.message : "NCBI BLAST query failed.");
+      } finally {
+          setIsProcessing(false);
+          setProgressMessage('');
       }
-
-      setIsProcessing(false);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,12 +203,31 @@ const PhylogenyAnalysis: React.FC<PhylogenyAnalysisProps> = ({ onBack }) => {
             </label>
           </div>
 
+          {errorMessage && (
+            <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center gap-2">
+              <AlertCircle size={16} className="shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {isProcessing && progressMessage && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-xs flex items-center gap-2">
+              <Activity className="animate-spin shrink-0" size={16} />
+              <span>{progressMessage}</span>
+            </div>
+          )}
+
           <div className="flex gap-4 mt-6">
              <div className="flex-1">
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Target Database (Cloud)</label>
-                <select className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
-                    <option>NCBI 16S ribosomal RNA (Bacteria/Archaea)</option>
-                    <option>NCBI Nucleotide Collection (nr/nt)</option>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Target Database (NCBI BLASTN)</label>
+                <select
+                  value={database}
+                  onChange={(e) => setDatabase(e.target.value as '16S_ribosomal_RNA' | 'nt')}
+                  disabled={isProcessing}
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                    <option value="16S_ribosomal_RNA">NCBI 16S ribosomal RNA (Bacteria/Archaea)</option>
+                    <option value="nt">NCBI Nucleotide Collection (nt)</option>
                 </select>
              </div>
              <div className="flex items-end">
@@ -200,7 +237,7 @@ const PhylogenyAnalysis: React.FC<PhylogenyAnalysisProps> = ({ onBack }) => {
                 className="bg-blue-600 text-white px-8 py-2.5 rounded-lg hover:bg-blue-700 flex items-center gap-2 font-bold shadow-md shadow-blue-200 transition-all disabled:opacity-70 disabled:cursor-wait"
                 >
                 {isProcessing ? <Activity className="animate-spin" size={18}/> : <Search size={18} />} 
-                {isProcessing ? 'Connecting to Cloud BLAST...' : 'Run Identification'}
+                {isProcessing ? 'Running NCBI BLAST...' : 'Run Identification'}
                 </button>
              </div>
           </div>
@@ -219,7 +256,7 @@ const PhylogenyAnalysis: React.FC<PhylogenyAnalysisProps> = ({ onBack }) => {
                </div>
                <div>
                    <h4 className="font-bold text-sm text-purple-900">
-                       Cloud Identification Results
+                       NCBI BLASTN Identification Results
                    </h4>
                    <p className="text-xs mt-1 text-purple-700">
                        Top Hit: <strong>{topHit?.organism}</strong>
@@ -230,7 +267,7 @@ const PhylogenyAnalysis: React.FC<PhylogenyAnalysisProps> = ({ onBack }) => {
                            {topHit?.identity}%
                        </span>
                        <span className="mx-2">•</span>
-                       Source: <span className="font-bold">NCBI/Gemini AI</span>
+                       Source: <span className="font-bold">NCBI BLASTN ({database})</span>
                    </p>
                </div>
            </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Disc, Plus, Trash2, Save, FileCode, UploadCloud, Play, CheckCircle, Dna, Activity, Search } from 'lucide-react';
+import { Disc, Plus, Trash2, FileCode, UploadCloud, Activity, Search, AlertTriangle } from 'lucide-react';
 
 interface PlasmidFeature {
   id: string;
@@ -28,6 +28,7 @@ const PlasmidMapper: React.FC = () => {
   const [sequence, setSequence] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisDone, setAnalysisDone] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   
   const [features, setFeatures] = useState<PlasmidFeature[]>([
     { id: '1', name: 'blaNDM-1', start: 150, end: 980, strand: 1, color: '#ef4444', type: 'RESISTANCE' },
@@ -62,30 +63,49 @@ const PlasmidMapper: React.FC = () => {
   };
 
   const handleAnalyze = () => {
+      setErrorMsg('');
       if (!sequence && mode === 'SEQUENCE') {
-          alert("Please enter a sequence or upload a file.");
+          setErrorMsg("Please enter a sequence or upload a FASTA file.");
           return;
       }
       setIsAnalyzing(true);
-      
-      // Simulate API processing time
       setTimeout(() => {
           setIsAnalyzing(false);
           setAnalysisDone(true);
           setFeatures(MOCK_ANALYSIS_RESULTS);
-          setSize(5200); // Update size based on "actual" sequence
-      }, 2000);
+          setSize(5200);
+      }, 600);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
-          setPlasmidName(e.target.files[0].name.split('.')[0]);
-          setSequence(">Mock_Sequence_Loaded\nATGCGT...");
+          const file = e.target.files[0];
+          setPlasmidName(file.name.split('.')[0]);
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            if (typeof ev.target?.result === 'string') {
+              setSequence(ev.target.result);
+            }
+          };
+          reader.readAsText(file);
       }
   };
 
   return (
     <div className="space-y-8 animate-fade-in">
+       <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-900 text-xs">
+           <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+           <span>
+               <strong>Illustrative sample data:</strong> Automated plasmid sequence annotation renders pre-configured reference ORF coordinates for demonstration rather than live sequence alignment.
+           </span>
+       </div>
+
+       {errorMsg && (
+           <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs">
+               {errorMsg}
+           </div>
+       )}
+
        {/* TOP CONTROLS */}
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* LEFT: MAP VISUALIZER */}

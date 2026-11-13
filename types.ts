@@ -17,14 +17,18 @@ export interface ChatMessage {
 
 export type SampleSource = 'CLINICAL' | 'WWTP' | 'RIVER' | 'SOIL' | 'LIVESTOCK';
 export type DataType = 'AST_ONLY' | 'PCR' | 'WGS' | 'RNA_SEQ';
+export type ReportStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface AMRReport {
   id: string;
+  authorId?: string;
   location: {
     state: string;
     city: string;
     siteName: string;
   };
+  latitude?: string;
+  longitude?: string;
   date: string;
   source: SampleSource;
   dataType: DataType;
@@ -32,9 +36,18 @@ export interface AMRReport {
   resistanceFlag: 'HIGH' | 'MEDIUM' | 'LOW';
   summary: string;
   submittedBy?: string;
+  submittedByInstitute?: string;
+  standard?: string;
+  fileName?: string;
+  filePath?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  status?: ReportStatus;
 }
 
+export type ThemePreference = 'light' | 'dark';
+
 export interface UserProfile {
+  uid?: string;
   name: string;
   designation: string;
   institute: string;
@@ -43,6 +56,7 @@ export interface UserProfile {
   mobile: string;
   orcid: string;
   avatarInitials: string;
+  themePreference?: ThemePreference;
 }
 
 // Chart Data Types

@@ -284,6 +284,13 @@ const NGSAnalysisTool: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const renderResults = () => {
     return (
         <div className="space-y-8 animate-fade-in max-w-6xl">
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-900 text-xs">
+                <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+                <span>
+                    <strong>Illustrative sample data, not computed from uploaded reads:</strong> QC scores, variant tables, resistome abundances, and volcano plot values below are pre-written demonstration outputs.
+                </span>
+            </div>
+
             {/* RESULTS HEADER */}
             <div className="flex justify-between items-center bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-6">

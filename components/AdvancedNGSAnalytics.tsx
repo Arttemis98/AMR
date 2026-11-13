@@ -159,7 +159,7 @@ const AdvancedNGSAnalytics: React.FC<AdvancedNGSAnalyticsProps> = ({ dataType })
                       <AlignJustify className="text-indigo-600" size={24} />
                       <div>
                          <h3 className="font-bold text-slate-800">Detected Resistome Inventory</h3>
-                         <p className="text-xs text-slate-500">Antimicrobial resistance genes identified with >95% identity.</p>
+                         <p className="text-xs text-slate-500">Antimicrobial resistance genes identified with &gt;95% identity.</p>
                       </div>
                    </div>
                    <div className="overflow-x-auto">
@@ -208,7 +208,7 @@ const AdvancedNGSAnalytics: React.FC<AdvancedNGSAnalyticsProps> = ({ dataType })
                          <span className="font-bold text-rose-800 text-sm">gyrA (D87N)</span>
                          <span className="bg-rose-200 text-rose-800 text-[10px] px-2 py-0.5 rounded-full font-bold">HIGH</span>
                       </div>
-                      <p className="text-xs text-rose-700">Aspartate -> Asparagine. Confers fluoroquinolone resistance.</p>
+                      <p className="text-xs text-rose-700">Aspartate &rarr; Asparagine. Confers fluoroquinolone resistance.</p>
                    </div>
     
                    <div className="p-3 bg-yellow-50 border-l-4 border-yellow-500 rounded-r-lg">
@@ -216,7 +216,7 @@ const AdvancedNGSAnalytics: React.FC<AdvancedNGSAnalyticsProps> = ({ dataType })
                          <span className="font-bold text-yellow-800 text-sm">parC (S80I)</span>
                          <span className="bg-yellow-200 text-yellow-800 text-[10px] px-2 py-0.5 rounded-full font-bold">MED</span>
                       </div>
-                      <p className="text-xs text-yellow-700">Serine -> Isoleucine. Secondary mutation.</p>
+                      <p className="text-xs text-yellow-700">Serine &rarr; Isoleucine. Secondary mutation.</p>
                    </div>
     
                    <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded-r-lg">

@@ -1,0 +1,212 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HARDENED PRIMITIVES ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    // --- ENTITY VALIDATION BLUEPRINTS ---
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'name', 'designation', 'institute', 'avatarInitials', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'name', 'designation', 'institute', 'orcid', 'avatarInitials', 'themePreference', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid == userId && isValidId(data.uid)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.designation is string && data.designation.size() >= 1 && data.designation.size() <= 120
+        && data.institute is string && data.institute.size() >= 1 && data.institute.size() <= 200
+        && (!('orcid' in data) || (data.orcid is string && data.orcid.size() <= 32))
+        && data.avatarInitials is string && data.avatarInitials.size() >= 1 && data.avatarInitials.size() <= 4
+        && (!('themePreference' in data) || (data.themePreference in ['light', 'dark']))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'mobile', 'address', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid == userId && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && (!('mobile' in data) || (data.mobile is string && data.mobile.size() <= 32))
+        && (!('address' in data) || (data.address is string && data.address.size() <= 300))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAMRReport(data) {
+      return data.keys().hasAll([
+          'authorId', 'submittedBy', 'state', 'city', 'siteName', 'date',
+          'source', 'dataType', 'standard', 'organism', 'resistanceFlag',
+          'summary', 'visibility', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'authorId', 'submittedBy', 'submittedByInstitute', 'state', 'city', 'siteName',
+          'latitude', 'longitude', 'date', 'source', 'dataType', 'standard',
+          'organism', 'resistanceFlag', 'summary', 'fileName', 'filePath',
+          'clinicalSampleType', 'ph', 'temperature', 'cod', 'visibility', 'status',
+          'createdAt', 'updatedAt'
+        ])
+        && data.authorId is string && isValidId(data.authorId)
+        && data.submittedBy is string && data.submittedBy.size() >= 1 && data.submittedBy.size() <= 120
+        && (!('submittedByInstitute' in data) || (data.submittedByInstitute is string && data.submittedByInstitute.size() <= 200))
+        && data.state is string && data.state.size() >= 1 && data.state.size() <= 80
+        && data.city is string && data.city.size() >= 1 && data.city.size() <= 80
+        && data.siteName is string && data.siteName.size() >= 1 && data.siteName.size() <= 120
+        && (!('latitude' in data) || (data.latitude is string && data.latitude.size() <= 32))
+        && (!('longitude' in data) || (data.longitude is string && data.longitude.size() <= 32))
+        && data.date is string && data.date.size() >= 4 && data.date.size() <= 20
+        && data.source in ['CLINICAL', 'WWTP', 'RIVER', 'SOIL', 'LIVESTOCK']
+        && data.dataType in ['AST_ONLY', 'PCR', 'WGS', 'RNA_SEQ']
+        && data.standard is string && data.standard.size() >= 1 && data.standard.size() <= 80
+        && data.organism is string && data.organism.size() >= 1 && data.organism.size() <= 120
+        && data.resistanceFlag in ['HIGH', 'MEDIUM', 'LOW']
+        && data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 500
+        && (!('fileName' in data) || (data.fileName is string && data.fileName.size() <= 200))
+        && (!('filePath' in data) || (data.filePath is string && data.filePath.size() <= 300))
+        && (!('clinicalSampleType' in data) || (data.clinicalSampleType is string && data.clinicalSampleType.size() <= 80))
+        && (!('ph' in data) || (data.ph is string && data.ph.size() <= 20))
+        && (!('temperature' in data) || (data.temperature is string && data.temperature.size() <= 20))
+        && (!('cod' in data) || (data.cod is string && data.cod.size() <= 20))
+        && data.visibility in ['PUBLIC', 'PRIVATE']
+        && data.status in ['PENDING', 'APPROVED', 'REJECTED']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // --- COLLECTION: USERS ---
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+
+      allow create: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'designation', 'institute', 'orcid', 'avatarInitials', 'themePreference', 'updatedAt'
+        ]);
+
+      allow delete: if false;
+
+      // --- SUBCOLLECTION: PRIVATE CONTACT PII ---
+      match /private/{infoId} {
+        allow get: if isValidId(userId)
+          && isValidId(infoId)
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow list: if false;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(infoId)
+          && infoId == 'contact'
+          && isValidUserPrivateInfo(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(infoId)
+          && infoId == 'contact'
+          && isValidUserPrivateInfo(incoming(), userId)
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'mobile', 'address', 'updatedAt'])
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+
+        allow delete: if false;
+      }
+    }
+
+    // --- COLLECTION: REPORTS ---
+    match /reports/{reportId} {
+      allow get: if isValidId(reportId) && (
+        (existing().visibility == 'PUBLIC' && existing().status == 'APPROVED')
+        || (isSignedIn() && existing().authorId == request.auth.uid)
+        || isAdmin()
+      );
+
+      allow list: if (existing().visibility == 'PUBLIC' && existing().status == 'APPROVED')
+        || (isSignedIn() && existing().authorId == request.auth.uid)
+        || isAdmin();
+
+      allow create: if isVerifiedUser()
+        && isValidId(reportId)
+        && isValidAMRReport(incoming())
+        && incoming().authorId == request.auth.uid
+        && incoming().status == 'PENDING'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(reportId)
+        && isValidAMRReport(incoming())
+        && incoming().authorId == existing().authorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isVerifiedUser()
+            && existing().authorId == request.auth.uid
+            && incoming().status == existing().status
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'summary', 'resistanceFlag', 'visibility', 'filePath', 'updatedAt'
+            ])
+          )
+          || (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isVerifiedUser()
+        && isValidId(reportId)
+        && existing().authorId == request.auth.uid;
+    }
+  }
+}

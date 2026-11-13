@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, ArrowRight, RefreshCw, GitMerge, FileText, UploadCloud, Play, ArrowLeft, CheckCircle, Table, Layers, ZoomIn, AlertCircle } from 'lucide-react';
+import { Activity, ArrowRight, RefreshCw, GitMerge, FileText, UploadCloud, Play, ArrowLeft, Table, Layers, AlertCircle, AlertTriangle } from 'lucide-react';
 
 // --- MOCK DATA: Fallback if no file is uploaded ---
 const DEMO_TRANSCRIPTOME = [
@@ -32,6 +32,7 @@ const MetabolicPathwayMapper: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'MAP' | 'TABLE'>('MAP');
   const [isUploading, setIsUploading] = useState(false);
   const [data, setData] = useState<TranscriptomeRow[]>(DEMO_TRANSCRIPTOME);
+  const [isDemoData, setIsDemoData] = useState(true);
   const [fileName, setFileName] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
@@ -98,6 +99,7 @@ const MetabolicPathwayMapper: React.FC = () => {
           if (parsedData.length === 0) throw new Error("No valid data rows found.");
 
           setData(parsedData);
+          setIsDemoData(false);
           setView('ANALYSIS');
       } catch (err: any) {
           setErrorMsg(err.message || "Failed to parse CSV file.");
@@ -115,11 +117,8 @@ const MetabolicPathwayMapper: React.FC = () => {
         const reader = new FileReader();
         reader.onload = (event) => {
             if (event.target?.result) {
-                // Simulate processing delay for UX
-                setTimeout(() => {
-                    processCSV(event.target!.result as string);
-                    setIsUploading(false);
-                }, 1000);
+                processCSV(event.target.result as string);
+                setIsUploading(false);
             }
         };
         reader.readAsText(file);
@@ -127,13 +126,10 @@ const MetabolicPathwayMapper: React.FC = () => {
   };
 
   const handleLoadDemo = () => {
-      setIsUploading(true);
-      setTimeout(() => {
-          setData(DEMO_TRANSCRIPTOME);
-          setFileName("Demo_Vancomycin_Resistance.csv");
-          setIsUploading(false);
-          setView('ANALYSIS');
-      }, 1000);
+      setData(DEMO_TRANSCRIPTOME);
+      setIsDemoData(true);
+      setFileName("Demo_Vancomycin_Resistance.csv");
+      setView('ANALYSIS');
   };
 
   const renderUpload = () => (
@@ -209,6 +205,15 @@ const MetabolicPathwayMapper: React.FC = () => {
 
   const renderAnalysis = () => (
     <div className="space-y-6 animate-fade-in">
+       <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-900 text-xs">
+           <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+           <span>
+               {isDemoData
+                 ? 'Illustrative sample data: Displaying the pre-written Vancomycin resistance demonstration dataset and illustrative pathway flux estimates.'
+                 : 'Illustrative flux note: Table rows reflect your uploaded CSV, while the KEGG flux percentage summary uses pre-written illustrative thresholds.'}
+           </span>
+       </div>
+
        {/* HEADER */}
        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
@@ -254,7 +259,7 @@ const MetabolicPathwayMapper: React.FC = () => {
                         </div>
                     </div>
                     
-                    <div className="relative h-[600px] w-full overflow-auto bg-white p-4 flex justify-center">
+                    <div className="relative h-[600px] w-full overflow-auto bg-white kegg-diagram-surface p-4 flex justify-center">
                         {/* KEGG STYLE SVG MAP */}
                         <svg viewBox="0 0 800 550" className="w-full h-full max-w-[800px]">
                             <defs>

@@ -15,7 +15,7 @@ const WorkflowDiagram: React.FC = () => {
             <MapIcon />
           </div>
           <h4 className="font-semibold text-slate-800 mb-1">Field Sampling</h4>
-          <p className="text-xs text-slate-500">Vadodara & Anand WWTPs.<br/>Influent -> Effluent</p>
+          <p className="text-xs text-slate-500">Vadodara & Anand WWTPs.<br/>Influent &rarr; Effluent</p>
         </div>
 
         {/* Arrow */}
